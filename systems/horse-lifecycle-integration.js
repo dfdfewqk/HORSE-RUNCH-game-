@@ -58,7 +58,7 @@
    const archived=Array.isArray(state.horseLegends)?state.horseLegends:[];
    const ids=new Set(awarded.map(h=>String(h.id)));
    const retained=archived.filter(x=>!ids.has(String(x.id)));
-   const names=awarded.map(h=>({id:h.id,name:h.name,title:A.title(h),age:h.age,wins:h.wins||0,retired:h.retired,reason:h.retired?'경주 은퇴':'현역',peakRating:A.ensureAchievements(h).peakRating,majorWins:A.ensureAchievements(h).majorWins}));
+   const names=awarded.map(h=>({id:h.id,name:h.name,title:A.title(h),age:h.age,wins:h.wins||0,retired:h.retired,reason:h.deceased?'자연사':h.retired?'경주 은퇴':'현역',peakRating:A.ensureAchievements(h).peakRating,majorWins:A.ensureAchievements(h).majorWins}));
    names.push(...retained.map(h=>({id:h.id,name:h.name,title:h.title,age:h.age,wins:h.wins,retired:true,reason:h.reason||'기록 보존',peakRating:h.peakRating,majorWins:h.majorWins||[]})));
    names.sort((a,b)=>(b.majorWins?.filter(x=>x.grade==='G1').length||0)-(a.majorWins?.filter(x=>x.grade==='G1').length||0)||
      (b.majorWins?.length||0)-(a.majorWins?.length||0)||(b.wins||0)-(a.wins||0));
