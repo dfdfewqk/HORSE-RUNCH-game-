@@ -19,6 +19,7 @@ function stableScore(h,world){
  return rating+(num(h.speed)+num(h.stamina)+num(h.power))/30+Math.min(20,points);
 }
 function ranking(world){
+ if(root.HorseRanchRanking)return root.HorseRanchRanking.ranking(world);
  const candidates=[{name:world.ranchName||'내 목장',player:true,horses:world.horses||[]},...(world.npcs||[]).map(n=>({...n,player:false}))];
  return candidates.map(r=>{
   const active=(r.horses||[]).filter(h=>!h.retired&&num(h.age)>=2);
