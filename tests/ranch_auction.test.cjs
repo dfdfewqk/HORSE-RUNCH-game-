@@ -1,0 +1,34 @@
+'use strict';
+const assert=require('node:assert/strict');
+const A=require('../systems/ranch-auction.js');
+function horse(id,rating){return{id,age:3,gender:'수',name:'Horse'+id,rating,speed:rating,stamina:rating,power:rating,starts:1,wins:0,history:[],retired:false};}
+const w={year:1,month:1,day:5,ranchName:'PLAYER',money:300000000,stalls:8,horses:[horse(1,51),horse(2,52)],npcs:Array.from({length:7},(_,k)=>({name:'NPC'+k,named:k<5,funds:200000000,stalls:100,horses:Array.from({length:10},(_,i)=>horse(10+k*10+i,98-k*5))})),registrations:[]};
+const priceFn=h=>10000000+Number(h.rating)*100000;
+assert.equal(A.weekday(1),0);assert.equal(A.weekday(5),4);assert.equal(A.weekday(12),4);
+assert.equal(A.ranking(w).find(x=>x.player).qualified,false);
+assert.equal(A.daily(w).length,5);
+assert.deepEqual(A.daily(w),A.daily(w),'market selection stable for a date');
+const a=A.openAuction(w,A.dayOf(w),priceFn);
+assert.equal(a.lots.length,5);assert.equal(a.status,'open');assert.equal(A.openAuction(w,A.dayOf(w),priceFn),a,'not regenerated Friday');
+assert.ok(a.lots.every(l=>a.eligibleNames.includes(l.seller)));
+assert.equal(A.consign(w,1,priceFn).ok,false,'non-elite may not consign');
+const lot=a.lots[0];const b=A.placeBid(w,lot.horseId,priceFn);assert.ok(b.ok);assert.equal(b.bid,lot.reserve);
+assert.equal(A.placeBid(w,lot.horseId,priceFn).bid,lot.reserve+500000);
+w.horses.forEach(h=>{h.rating=110;h.speed=98;h.stamina=98;h.power=98;});
+assert.equal(A.ranking(w).find(x=>x.player).qualified,true,'player can rise on merit');
+// A Friday's qualified sellers are frozen at opening; next Friday updates the rank.
+assert.equal(A.consign(w,1,priceFn).ok,false);
+const priorCount=w.horses.length,allId=new Set([...w.horses,...w.npcs.flatMap(n=>n.horses)].map(h=>h.id));
+const result=A.closeAuction(w,6,{archive:()=>{}});assert.ok(result.applied);
+assert.equal(A.closeAuction(w,6).applied,false,'auction settled once');
+assert.ok(result.sold>=0&&result.sold<=5);assert.ok(w.horses.length>=priorCount);
+assert.equal(new Set([...w.horses,...w.npcs.flatMap(n=>n.horses)].map(h=>h.id)).size,allId.size,'horse identity preserved');
+w.day=12;w.ranchName='NPC0';const next=A.openAuction(w,A.dayOf(w),priceFn);assert.ok(next.eligiblePlayer,'player can qualify even if the chosen ranch name duplicates an NPC ranch');
+assert.equal(A.consign(w,1,priceFn).ok,true);assert.equal(A.consign(w,2,priceFn).ok,false,'weekly consign limit');
+const firstPrice=next.consignment.reserve;assert.ok(firstPrice>0);
+const settlement=A.closeAuction(w,13,{archive:()=>{}});assert.equal(settlement.applied,true);
+const ownResult=settlement.results.find(x=>String(x.horseId)==='1');assert.ok(ownResult);
+assert.equal(ownResult.status==='sold'?!w.horses.some(h=>h.id===1):w.horses.some(h=>h.id===1),true,'ownership only moves on sale');
+const snap=JSON.parse(JSON.stringify(w));assert.equal(A.closeAuction(snap,13).applied,false);
+assert.equal(snap.ranchAuction.history.length,2);
+console.log('RANCH_AUCTION_UNIT_PASS');
