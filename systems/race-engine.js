@@ -44,6 +44,10 @@
       const h=entry.horse, j=entry.jockey||null;
       const speed=numeric(h.speed,70), stamina=numeric(h.stamina,70), power=numeric(h.power,70);
       const cond=numeric(h.condition,82), fatigue=numeric(h.fatigue,0), hoof=numeric(h.hoof,100);
+      // Schooling is a modest *reliability* benefit, only after the adult personality locks.
+      // Unschoolled legacy horses retain precisely their previous race calculation.
+      const school=h.foalEducation?.locked?h.foalEducation.skills:null;
+      const schoolBonus=school?clamp((numeric(school.calm,0)+numeric(school.gate,0))*.00055,0,.077):0;
       const preferredBand=BANDS.indexOf(h.distanceBand);
       const gap=preferredBand===-1?0:Math.abs(preferredBand-raceBand);
       const mismatchedSurface=!!(h.surface && race.surface && h.surface!==race.surface);
@@ -52,7 +56,7 @@
       const jockeyPace=numeric(j?.pace,77), jockeyCorner=numeric(j?.corner,77), jockeyFinish=numeric(j?.finish,77);
       // A null/unknown friendship never silently becomes a numerical bonus.
       const friendship=entry.friendship == null ? null : clamp(numeric(entry.friendship,0),0,100);
-      const base=16.2+(speed-70)*.042+(stamina-70)*.008+(cond-80)*.008-
+      const base=16.2+schoolBonus+(speed-70)*.042+(stamina-70)*.008+(cond-80)*.008-
         fatigue*.011-(100-hoof)*.005-gap*.29-(mismatchedSurface?.24:0)+
         (goodStyle?.075:0)+(goodBand?.04:0)+(j?(jockeyPace-77)*.0025:0);
       return {

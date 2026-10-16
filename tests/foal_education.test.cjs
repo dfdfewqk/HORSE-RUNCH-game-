@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const F=require('../systems/foal-education.js');
+const h={id:1,name:'테스트',age:0,speed:60,stamina:60,power:60,genetic:{speed:88,stamina:85,power:80},caps:{speed:95,stamina:90,power:85},growthFoundation:{innateTemperament:'예민'},condition:90};
+F.initializeBirth(h,20,()=>.5);
+assert.equal(h.age,0);
+assert.equal(F.trainFoal(h,'gate','1-1',()=>.5).ok,false);
+for(let i=0;i<3;i++)assert.equal(F.trainFoal(h,'handling','1-1',()=>.5).ok,true);
+assert.equal(F.trainFoal(h,'handling','1-1',()=>.5).ok,false);
+F.updateAge(h,740);
+assert.equal(h.age,2);
+assert.equal(h.foalEducation.locked,true);
+const personality=h.foalEducation.finalPersonality;
+F.updateAge(h,1100);
+assert.equal(h.foalEducation.finalPersonality,personality);
+console.log('20.4 education foundation PASS');
