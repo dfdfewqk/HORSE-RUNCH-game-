@@ -58,7 +58,7 @@
    for(let i=0;i<choices.length;i++){roll-=weights[i];if(roll<0)return choices[i].key;}
    return choices.at(-1).key;
  }
- function trainRanch(ranch,plan,month,gainFn){
+ function trainRanch(ranch,plan,month,gainFn,sessionBudget=Infinity){
    const summary={month,eligible:0,sessions:0,gains:0,improved:0,estimatedCost:0};
    for(const h of ranch.horses||[]){
      if(!h||h.retired||h.injury||h.pregnantUntil||Number(h.age)<2||Number(h.age)>=8)continue;
@@ -69,6 +69,7 @@
      // this avoids creating permanently unrecovered NPC fatigue, which 20.5
      // has no autonomous recovery mechanism for.
      for(let i=0;i<plan.sessions;i++){
+       if(summary.sessions>=sessionBudget)break;
        const stat=chooseStat(h,plan,random);
        if(!stat)break;
        const shadow={...h,fatigue:clamp((Number(h.fatigue)||0)+i*10,0,100)};
@@ -81,7 +82,7 @@
    summary.estimatedCost=summary.sessions*TRAINING_COST;
    return summary;
  }
- function advance(world,gainFn){
+ function advance(world,gainFn,opts={}){
    const store=ensure(world),month=monthOf(world);
    if(store.lastMonth===month)return{applied:false,month};
    if(typeof gainFn!=='function')throw Error('공통 조교 성장 함수를 찾을 수 없습니다.');
@@ -92,7 +93,8 @@
    for(const ranch of world.npcs||[]){
      if(!ranch.named)continue;
      const plan=store.ranches[ranch.name]||(store.ranches[ranch.name]=planFor(ranch,world,q));
-     const summary=trainRanch(ranch,plan,month,gainFn);
+     const maxSessions=typeof opts.trainingBudget==='function'?opts.trainingBudget(ranch,world):Infinity;
+     const summary=trainRanch(ranch,plan,month,gainFn,maxSessions);
      plan.last=summary;
      summaries.push({ranch:ranch.name,...summary});
    }

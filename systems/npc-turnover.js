@@ -78,10 +78,14 @@ function advance(world,make){
       const report={ranch:ranch.name,named:!!ranch.named,added:0,rookies:0,experienced:0,activeBefore:plan.active,stalls:ranch.stalls,horseIds:[],examples:[]};
       for(let i=0;i<count;i++){
         const spec=candidate(ranch,year,i,plan);
+        const economy=root.HorseRanchEconomy;
+        const recruitmentFee=economy?economy.recruitmentCost(spec):0;
+        if(economy&&!economy.canRecruit(ranch,recruitmentFee))continue;
         const newHorse=make(spec,ranch,year);
         if(!newHorse||!Number.isFinite(Number(newHorse.id)))throw Error('NPC 신규 영입마 생성 실패');
         if(ranch.horses.some(h=>String(h.id)===String(newHorse.id)))throw Error('NPC 영입마 ID 중복');
         newHorse.npcArrival={year,source:spec.source,ranch:ranch.name};
+        if(economy&&!economy.chargeRecruit(world,ranch,recruitmentFee))continue;
         ranch.horses.push(newHorse);
         report.added++;
         if(spec.experienced)report.experienced++;else report.rookies++;
