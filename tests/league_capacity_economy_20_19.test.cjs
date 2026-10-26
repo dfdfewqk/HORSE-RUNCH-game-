@@ -9,6 +9,7 @@ const Rules=require('../systems/competition-rules.js');
 const Economy=require('../systems/ranch-economy.js');
 const Turnover=require('../systems/npc-turnover.js');
 const Training=require('../systems/npc-training.js');
+const Engine=require('../systems/race-engine.js');
 let seed=42,nextId=1;
 const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
 const rnd=(a,b)=>a+Math.floor(random()*(b-a+1));
@@ -118,5 +119,18 @@ for(let year=1;year<=3;year++){
      races:s.events,averageEntrants:+(s.entrants/s.events).toFixed(1),
      cancelled:s.cancelled,under8:s.under8}]))});
 }
+// Verify that a representative real physical race accepts the same entrant data.
+const example=League.generate(1).find(r=>r.grade==='G3');
+const physical=Engine.simulate({race:example,entrants:Array.from({length:8},()=>({
+ horse:horse(70,85,3,1),jockey:null,friendship:null
+}))});
+assert.equal(physical.results.length,8,'real race engine resolves complete field');
+assert.equal(new Set(physical.results.map(x=>x.horseId)).size,8);
+assert.ok(physical.results.every((x,i)=>x.place===i+1&&Number.isFinite(x.time)));
+const saved=JSON.parse(JSON.stringify(world));
+assert.equal(saved.npcs.length,13);
+assert.equal(saved.ranchEconomy.lastMonth,'3-12');
+assert.equal(saved.npcAutoRacing.totalRaces,report.reduce((x,y)=>x+y.held,0));
+console.log('REAL ENGINE sample: 8 finishers; 3-year save round-trip bytes: '+JSON.stringify(world).length);
 console.log('DIAGNOSTIC SYNTHETIC 13 NPC RANCHES / 352 INITIAL HORSES');
 console.log(JSON.stringify(report,null,2));
