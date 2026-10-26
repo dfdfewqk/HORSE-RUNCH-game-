@@ -96,4 +96,23 @@ function start(game){
   assert.deepEqual(b.errors,[]);
   console.log('OK full-script 720-day simulation and save/reload');
 }
+{
+  const a=boot();
+  start(a);
+  for(let month=0;month<60;month++){
+    a.run('advanceMonth()');
+    assert.equal(a.run('state.day')>=1&&a.run('state.day')<=30,true,'valid month day');
+    assert.equal(a.run('state.month')>=1&&a.run('state.month')<=12,true,'valid year month');
+  }
+  assert.equal(a.run('today()'),1801,'5 years of 360 days elapsed');
+  assert.equal(a.run('state.year'),6);
+  assert.equal(a.run('state.month'),1);
+  assert.equal(a.run('state.day'),1);
+  assert.equal(a.run('new Set(allHorseObjects().map(h=>String(h.id))).size===allHorseObjects().length'),true,'no duplicate horse identities');
+  assert.deepEqual(a.errors,[],'5-year simulation should not log integration errors');
+  const stored=boot([...a.storage]);
+  assert.equal(stored.run('today()'),1801,'5-year save must restore date');
+  assert.deepEqual(stored.errors,[],'5-year reload must load scripts');
+  console.log('OK full-script 1800-day (five-year) simulation and save/reload');
+}
 console.log('PASS full game integration smoke');
