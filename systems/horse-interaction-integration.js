@@ -35,7 +35,12 @@ sellHorse=function(id){if(I.occupied(state,id))return alert('시설에 위탁 �
 const beforeBuy=buyHorse;
 buyHorse=function(id,owner){return beforeBuy.apply(this,arguments);};
 const beforeConsign=window.hrAuctionConsign;
-if(typeof beforeConsign==='function')window.hrAuctionConsign=function(id){if(I.occupied(state,id))return alert('시설 위탁 중에는 특별 경매에 출품할 수 없습니다.');return beforeConsign.apply(this,arguments);};
+if(typeof beforeConsign==='function')window.hrAuctionConsign=function(id){
+ if(I.occupied(state,id))return alert('시설 위탁 중에는 특별 경매에 출품할 수 없습니다.');
+ const h=hById(id);
+ if(h&&window.HorseRanchLifeSpan?.hasPendingBreeding(state,h))return alert('출산 예약의 부모 말은 출산이 끝날 때까지 특별 경매에 출품할 수 없습니다.');
+ return beforeConsign.apply(this,arguments);
+};
 const beforeBreeding=breed;
 breed=function(){if(I.occupied(state,state.selectedDam)||I.occupied(state,state.selectedSire))return alert('시설 위탁 중인 말은 교배에 사용할 수 없습니다.');return beforeBreeding.apply(this,arguments);};
 const beforeRegister=registerRace;
