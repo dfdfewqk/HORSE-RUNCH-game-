@@ -42,7 +42,7 @@ function world(){return{year:1,month:1,day:1,stalls:2,horses:[
  assert.equal(C.siteCount(w),2);
 }
 {
- const w=world();w.registrations=[{raceId:'R1',horseId:1}];
+ const w=world();w.stalls=1;w.registrations=[{raceId:'R1',horseId:1}];
  C.queue(w,1);
  assert.equal(w.registrations.length,0,'retirement clears prior race booking');
  assert.equal(C.decide(w,1,'board').ok,true);
