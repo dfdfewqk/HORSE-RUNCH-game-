@@ -14,6 +14,9 @@ const priorBuy=buyHorse;
 buyHorse=function(id,owner){
  const seller=state.npcs.find(x=>x.name===owner);
  const h=seller?.horses.find(x=>String(x.id)===String(id));
+ if(h&&(seller.horses.length<=E.CONFIG.minRanchHorses||E.isProtected(state,seller,h))){
+  return alert('해당 NPC 목장의 핵심 경주마·번식마는 판매 대상이 아닙니다.');
+ }
  const price=h?marketPrice(h):0;
  const priorBalance=state.money;
  const out=priorBuy.apply(this,arguments);
