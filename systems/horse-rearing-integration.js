@@ -55,8 +55,11 @@ advanceDay=function(...args){
  if(report.recovered)log('육성마 성장 회복 · '+report.recovered+'점 보완');
  // The normal base upkeep already covers routine feeding and farrier visits:
  // avoid charging a second daily or monthly fee for automatic care.
- if(report.delayed||report.recovered||hoof||report.overcrowded){
-  if(!args[0]&&!HR_BATCH_DAY){save();render();}
+ if(!args[0]&&!HR_BATCH_DAY){
+  // The base day loop saved before this late integration executed.
+  // Persist new rearing state every ordinary day, not only on events.
+  save();
+  if(report.delayed||report.recovered||hoof||report.overcrowded)render();
  }
  return result;
 };
