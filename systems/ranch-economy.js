@@ -62,7 +62,13 @@ function creditFinishedRaces(world){
   // Historical game migration prevents retroactive revenue on load; new
   // races are stamped only by the live integration at their real completion.
   for(const row of race.result||[]){
-   const receiver=ownerOf.get(String(row.horseId));if(!receiver)continue;
+   const owners=race.npcPurseOwners;
+   const savedOwner=owners&&Object.prototype.hasOwnProperty.call(owners,String(row.horseId))
+    ?owners[String(row.horseId)]:null;
+   const receiver=owners
+    ?(world.npcs||[]).find(r=>r.name===savedOwner)
+    :ownerOf.get(String(row.horseId));
+   if(!receiver)continue;
    const award=Math.round(pricePool(race,Number(row.place)));
    if(award>0){receiver.funds=n(receiver.funds)+award;e.ranches[receiver.name].totalPrizes+=award;paid+=award;events++;}
   }
