@@ -153,4 +153,17 @@ function start(game){
   assert.deepEqual(g.errors,[]);
   console.log('OK authorized entry, prize distribution 80:15:5, no duplicate reward');
 }
+{
+  const a=boot(),b=boot();start(a);start(b);
+  for(const g of [a,b]){
+    const o=g.run('HorseRanchConsignment.offers()[0]');
+    g.run('hrConsignmentAccept('+JSON.stringify(o.owner.name)+','+o.horse.id+',"race")');
+  }
+  for(let day=0;day<30;day++)a.run('advanceDay()');
+  b.run('advanceMonth()');
+  assert.equal(a.snapshot(),b.snapshot(),'consignment daily and 30-day batch should produce identical world state');
+  assert.deepEqual(a.errors,[]);
+  assert.deepEqual(b.errors,[]);
+  console.log('OK consignment contract day-by-day equals 30-day batch');
+}
 console.log('PASS consignment contract integration');
