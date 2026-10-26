@@ -200,6 +200,12 @@ function race(c,rid,jid){
 }
 window.HorseRanchConsignment={CFG,ensure,active,offers,accept,contracted,school,rider,tick,racePermission,register,race,slots};
 ensure();
+const priorAllHorses=allHorseObjects;
+allHorseObjects=function(){
+  const list=priorAllHorses(),ids=new Set(list.map(h=>String(h.id)));
+  for(const c of active())if(!ids.has(String(c.horse.id))){list.push(c.horse);ids.add(String(c.horse.id));}
+  return list;
+};
 const priorNormalize=normalize;normalize=function(){const r=priorNormalize.apply(this,arguments);ensure();return r;};
 const priorDay=advanceDay;advanceDay=function(...args){const before=dayOf(state),ret=priorDay.apply(this,args);if(state.startDone&&dayOf(state)>before&&tick()){save();if(!args[0]&&!HR_BATCH_DAY)render();}return ret;};
 const priorDashboard=dashboard;dashboard=function(){return priorDashboard()+panel();};
