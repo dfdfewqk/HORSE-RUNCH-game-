@@ -42,6 +42,7 @@ body{background:radial-gradient(circle at 50% 0,#283a50 0,#0b0d10 45%)}
 'use strict';
 const VERSION='20.1-data-foundation';
 const SAVE_KEY='horse_ranch_v193';
+const SAVE_BACKUP_KEY='horse_ranch_v193_backup';
 const HORSE_IMAGE_COUNT=150;
 const NAMES=['블랙스타','골든윈드','실버문','체리블라썸','선샤인','나이트스톰','로즈퀸','윈터스노우','다크레전드','미스티블루','스톰레이','화이트벨','골든로드','문라이트','리버킹','썬더벨','플레임하트','아크샤인'];
 const NAME_PREFIX=['아크','블랙','골든','실버','미스티','나이트','윈터','스톰','화이트','문','리버','썬더','플레임','로즈','루나','오로라','노블','브레이브','그랜드','블루','레드','스카이','윈드','스타','샤인'];
@@ -70,8 +71,54 @@ const dateIndex=(y=state.year,m=state.month,d=state.day)=>(y-1)*360+(m-1)*30+d; 
 const age=h=>Math.floor(Number(h.age)||0); const horse=id=>state.horses.find(h=>Number(h.id)===Number(id)); const getJockey=id=>JOCKEYS.find(j=>j.id===id);
 const band=d=>{d=Number(d);if(d<=1400)return'단거리';if(d===1600)return'마일';if(d<=2400)return'중거리';if(d<=3200)return'장거리';return'초장거리'};
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
-function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(state))}catch(e){window.__hrmem=JSON.stringify(state)}}
-function load(){let raw=null;try{raw=localStorage.getItem(SAVE_KEY)}catch(e){raw=window.__hrmem||null}if(!raw)return false;try{Object.assign(state,JSON.parse(raw));normalize();return true}catch(e){return false}}
+function save(){
+  if(window.__hrSaveRecoveryNeeded)return false;
+  let encoded;
+  try{encoded=JSON.stringify(state)}catch(e){window.__hrSaveWriteError=String(e);return false;}
+  try{
+    if(!window.__hrBackupCreatedInSession){
+      const previous=localStorage.getItem(SAVE_KEY);
+      if(previous&&previous!==encoded){
+        try{
+          const old=JSON.parse(previous);
+          if(old&&typeof old==='object'&&!Array.isArray(old)){
+            localStorage.setItem(SAVE_BACKUP_KEY,previous);
+            window.__hrBackupCreatedInSession=true;
+          }
+        }catch(e){/* Retain a prior good backup. */}
+      }
+    }
+    localStorage.setItem(SAVE_KEY,encoded);
+    window.__hrSaveWriteError=null;
+    return true;
+  }catch(e){window.__hrmem=encoded;window.__hrSaveWriteError=String(e);return false;}
+}
+function load(){
+  let primary=null,backup=null;
+  try{primary=localStorage.getItem(SAVE_KEY);backup=localStorage.getItem(SAVE_BACKUP_KEY)}
+  catch(e){primary=window.__hrmem||null}
+  if(!primary)return false;
+  const defaults=JSON.parse(JSON.stringify(state));
+  for(const [source,raw] of [['main',primary],['backup',backup]]){
+    if(!raw)continue;
+    try{
+      const saved=JSON.parse(raw);
+      if(!saved||typeof saved!=='object'||Array.isArray(saved)||
+         typeof saved.startDone!=='boolean'||!Number.isInteger(Number(saved.year))||
+         Number(saved.year)<1||!Number.isInteger(Number(saved.month))||
+         Number(saved.month)<1||Number(saved.month)>12||
+         !Number.isInteger(Number(saved.day))||Number(saved.day)<1||Number(saved.day)>30){
+        throw new Error('Invalid core game save');
+      }
+      Object.assign(state,defaults,saved);
+      normalize();
+      if(source==='backup')window.__hrSaveRecovered=true;
+      return true;
+    }catch(e){Object.assign(state,defaults);}
+  }
+  window.__hrSaveRecoveryNeeded=true;
+  return false;
+}
 function log(t){state.log.unshift(`[${state.year}/${state.month}/${state.day}] ${t}`);state.log=state.log.slice(0,120)}
 function horseScore(h){return Math.round((h.speed+h.stamina+h.power+h.pedigree)/4)}
 /* Asset interface: enable external images once the separate visual redesign is ready. */
@@ -95,7 +142,7 @@ function makeHorse(ageValue=3,o={}){const base=rnd(58,84),gp=clamp(Number(o.gp||
 function initialCareer(a){const ranges={2:[0,3],3:[3,10],4:[8,18],5:[14,27],6:[20,34],7:[26,42]};const [lo,hi]=ranges[a]||[24,40];const starts=rnd(lo,hi);const wr=a===2?rnd(0,8):a===3?rnd(4,18):a===4?rnd(6,22):rnd(8,28);const wins=Math.min(starts,Math.round(starts*wr/100));const rem=starts-wins;const seconds=Math.min(rem,rnd(0,Math.max(0,Math.floor(starts*.18))));const thirds=Math.min(Math.max(0,rem-seconds),rnd(0,Math.max(0,Math.floor(starts*.14))));return{starts,wins,seconds,thirds}}
 function generateRaces(){state.races=[];const raceDays=[10,24];const distByNo=[[1200,1400,1600],[1600,1800,2000],[2000,2400,3000]];for(let m=1;m<=12;m++)for(const d of raceDays)for(let no=1;no<=3;no++){const dist=pick(distByNo[no-1]);let grade=no===3?pick(['일반','특별','G3']):no===2?pick(['일반','일반','특별','미승리']):pick(['일반','일반','신마','미승리']);const surface=pick(['잔디','잔디','더트']);state.races.push({id:`${state.year}-${m}-${d}-${no}`,year:state.year,month:m,day:d,no,grade,dist,band:band(dist),surface,weather:pick(['맑음','맑음','흐림']),state:'open',prize:{신마:2500000,미승리:2500000,일반:4500000,특별:8000000,G3:16000000}[grade]||2500000})}[[3,24,'G1',1600,'잔디'],[6,24,'G1',2000,'더트'],[9,24,'G1',2400,'잔디'],[12,24,'G1',3000,'잔디']].forEach(([m,d,g,dist,s])=>{const rr=state.races.find(r=>r.month===m&&r.day===d&&r.no===3);if(rr)Object.assign(rr,{grade:g,dist,band:band(dist),surface:s,prize:70000000})})}
 function seed(){state.pool=[];state.horses=[];state.npcs=[];state.selectedStart=[];state.startPage=0;state.nextId=1;for(let i=0;i<50;i++){const a=rnd(2,6),rec=initialCareer(a);state.pool.push(makeHorse(a,{name:uniqueHorseName(pick(NAMES)),...rec,coat:COATS[i%COATS.length],imageId:i+1}))}const ranches=['청마목장','한빛목장','로열힐','서광목장','그린필드','블루리본','골든브릿지','선샤인팜'];ranches.forEach((name,idx)=>{const hs=[];for(let k=0;k<18;k++){const a=rnd(2,7),rec=initialCareer(a);hs.push(makeHorse(a,{name:uniqueHorseName(`${name.slice(0,2)}${pick(['스타','킹','퀸','로드','윈드'])}`),...rec,imageId:51+((idx*18+k)%100)}))}state.npcs.push({name,horses:hs})});generateRaces();normalize();log('새로운 목장을 시작하세요. 목장 이름을 정한 뒤 5마리를 선택합니다.');save();render()}
-function normalize(){state.version=VERSION;state.selectedStart=Array.isArray(state.selectedStart)?state.selectedStart:[];state.breedingDamQuery=typeof state.breedingDamQuery==='string'?state.breedingDamQuery:'';state.breedingSireQuery=typeof state.breedingSireQuery==='string'?state.breedingSireQuery:'';state.startPage=Number.isFinite(Number(state.startPage))?Math.max(0,Number(state.startPage)):0;state.registrations=Array.isArray(state.registrations)?state.registrations:[];state.breedings=Array.isArray(state.breedings)?state.breedings:[];state.results=Array.isArray(state.results)?state.results:[];state.races=Array.isArray(state.races)?state.races:[];state.pool=Array.isArray(state.pool)?state.pool:[];state.horses=Array.isArray(state.horses)?state.horses:[];state.npcs=Array.isArray(state.npcs)?state.npcs:[];state.horses?.forEach(ensureHorse);state.pool?.forEach(ensureHorse);state.npcs?.forEach(n=>n.horses?.forEach(ensureHorse));state.races?.forEach(r=>r.band=band(r.dist));if(state.races.some(r=>Number(r.no)>3)||state.races.length>130){const oldFinished=state.races.filter(r=>r.state==='finished');const finished=new Map(oldFinished.map(r=>[r.id,{state:r.state,result:r.result}]));const regs=state.registrations.slice();generateRaces();state.races.forEach(r=>{const f=finished.get(r.id);if(f)Object.assign(r,f)});const historyIds=new Set(state.results.map(x=>x.raceId));oldFinished.filter(r=>historyIds.has(r.id)&&!state.races.some(nr=>nr.id===r.id)).forEach(r=>state.races.push(r));state.registrations=regs.filter(x=>state.races.some(r=>r.id===x.raceId&&r.state!=='finished'));}const usedNames=new Set();allHorseObjects().forEach(h=>{let n=cleanHorseName(h.name);if(!n||usedNames.has(n)){for(const a of NAME_PREFIX){for(const b of NAME_SUFFIX){const c=a+b;if(!usedNames.has(c)){n=c;break}}if(n&&!usedNames.has(n))break}}h.name=n||'새벽의바람';usedNames.add(h.name)});state.results.forEach(x=>{const hh=allHorseObjects().find(h=>Number(h.id)===Number(x.horseId));if(hh)x.horse=hh.name});state.breedings.forEach(x=>{const a=allHorseObjects().find(h=>Number(h.id)===Number(x.mareId)),b=allHorseObjects().find(h=>Number(h.id)===Number(x.sireId));if(a)x.mareName=a.name;if(b)x.sireName=b.name;x.foalName=cleanHorseName(x.foalName)||uniqueHorseName()});state.training=state.training||{monthKey:monthKey(),used:{}};state.training.used=state.training.used||{};if(state.training.monthKey!==monthKey()){state.training.monthKey=monthKey();state.training.used={}}}
+function normalize(){state.log=Array.isArray(state.log)?state.log:[];state.version=VERSION;state.selectedStart=Array.isArray(state.selectedStart)?state.selectedStart:[];state.breedingDamQuery=typeof state.breedingDamQuery==='string'?state.breedingDamQuery:'';state.breedingSireQuery=typeof state.breedingSireQuery==='string'?state.breedingSireQuery:'';state.startPage=Number.isFinite(Number(state.startPage))?Math.max(0,Number(state.startPage)):0;state.registrations=Array.isArray(state.registrations)?state.registrations:[];state.breedings=Array.isArray(state.breedings)?state.breedings:[];state.results=Array.isArray(state.results)?state.results:[];state.races=Array.isArray(state.races)?state.races:[];state.pool=Array.isArray(state.pool)?state.pool:[];state.horses=Array.isArray(state.horses)?state.horses:[];state.npcs=Array.isArray(state.npcs)?state.npcs:[];state.horses=state.horses.filter(h=>h&&typeof h==='object');state.pool=state.pool.filter(h=>h&&typeof h==='object');state.npcs=state.npcs.filter(n=>n&&typeof n==='object').map(n=>{n.horses=Array.isArray(n.horses)?n.horses.filter(h=>h&&typeof h==='object'):[];return n});state.horses?.forEach(ensureHorse);state.pool?.forEach(ensureHorse);state.npcs?.forEach(n=>n.horses?.forEach(ensureHorse));state.races?.forEach(r=>r.band=band(r.dist));if(state.races.some(r=>Number(r.no)>3)||state.races.length>130){const oldFinished=state.races.filter(r=>r.state==='finished');const finished=new Map(oldFinished.map(r=>[r.id,{state:r.state,result:r.result}]));const regs=state.registrations.slice();generateRaces();state.races.forEach(r=>{const f=finished.get(r.id);if(f)Object.assign(r,f)});const historyIds=new Set(state.results.map(x=>x.raceId));oldFinished.filter(r=>historyIds.has(r.id)&&!state.races.some(nr=>nr.id===r.id)).forEach(r=>state.races.push(r));state.registrations=regs.filter(x=>state.races.some(r=>r.id===x.raceId&&r.state!=='finished'));}const usedNames=new Set();allHorseObjects().forEach(h=>{let n=cleanHorseName(h.name);if(!n||usedNames.has(n)){for(const a of NAME_PREFIX){for(const b of NAME_SUFFIX){const c=a+b;if(!usedNames.has(c)){n=c;break}}if(n&&!usedNames.has(n))break}}h.name=n||'새벽의바람';usedNames.add(h.name)});state.results.forEach(x=>{const hh=allHorseObjects().find(h=>Number(h.id)===Number(x.horseId));if(hh)x.horse=hh.name});state.breedings.forEach(x=>{const a=allHorseObjects().find(h=>Number(h.id)===Number(x.mareId)),b=allHorseObjects().find(h=>Number(h.id)===Number(x.sireId));if(a)x.mareName=a.name;if(b)x.sireName=b.name;x.foalName=cleanHorseName(x.foalName)||uniqueHorseName()});state.training=state.training&&typeof state.training==='object'&&!Array.isArray(state.training)?state.training:{monthKey:monthKey(),used:{}};state.training.used=state.training.used&&typeof state.training.used==='object'&&!Array.isArray(state.training.used)?state.training.used:{};if(state.training.monthKey!==monthKey()){state.training.monthKey=monthKey();state.training.used={}}}
 function round10k(n){return Math.round(n/10000)*10000}
 function baseRecruitPrice(h){const score=horseScore(h);const raw=2200000+Math.max(0,score-60)*85000+Math.max(0,age(h)-2)*160000+h.wins*35000;return clamp(round10k(raw),1800000,7800000)}
 function recruitPrice(h){if(!h)return 0;return Number(h.initialPrice)||baseRecruitPrice(h)}
@@ -165,8 +212,13 @@ function quickRace(id){const next=state.races.filter(r=>dateIndex(r.year,r.month
 function nav(){const main=[['dashboard','홈'],['stable','마방'],['training','말 교육'],['races','경주'],['breeding','번식']];const more=[['market','시장'],['jockey','기수'],['history','기록실']];return `<div class="nav">${main.map(([k,l])=>`<button class="${state.tab===k?'active':''}" onclick="state.tab='${k}';render()">${l}</button>`).join('')}<button class="${state.menu?'active':''}" onclick="state.menu=!state.menu;render()">${state.menu?'관리 닫기':'관리 메뉴'}</button></div>${state.menu?`<div class="subnav">${more.map(([k,l])=>`<button class="${state.tab===k?'active':''}" onclick="state.tab='${k}';state.menu=false;render()">${l}</button>`).join('')}</div>`:''}`}
 function header(){return `<div class="top"><div class="brand"><div class="brandMark">♞</div><div><h1>${escapeHtml(state.ranchName||'HORSE RANCH')}</h1><div class="sub">경주마 육성 · 혈통 · 번식</div></div></div><div class="hud"><b>${money(state.money)}</b> · 명성 ${state.reputation}<br><span class="small">${state.year}년 ${state.month}월 ${state.day}일 · ${state.horses.length}/${state.stalls}마</span></div></div>`}
 function footer(){return `<div class="panel"><div class="panelTitle"><h3>최근 기록</h3><div class="row"><button class="action gray" onclick="save()">저장</button><button class="action red" onclick="resetGame()">새 게임</button></div></div><div style="max-height:160px;overflow:auto;background:#0e1115;border:1px solid #343943;border-radius:6px;padding:8px;font-size:12px">${state.log.map(x=>`<div style="padding:3px 0;border-bottom:1px dashed #2c3138">${escapeHtml(x)}</div>`).join('')}</div></div>`}
-function render(){let content;if(!state.startDone){content=intro()}else{const map={dashboard,stable,training,races:raceList,breeding,market,jockey:jockeyView,history};content=state.tab==='training'&&!window.HorseRanchLifeCycle?'<div class="panel">교육 시스템을 준비하고 있습니다.</div>':map[state.tab]?.()||dashboard()}$('root').innerHTML=header()+nav()+content+footer()}
-function resetGame(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload()}
+function render(){let content;if(!state.startDone){content=intro()}else{const map={dashboard,stable,training,races:raceList,breeding,market,jockey:jockeyView,history};content=state.tab==='training'&&!window.HorseRanchLifeCycle?'<div class="panel">교육 시스템을 준비하고 있습니다.</div>':map[state.tab]?.()||dashboard()}const storageNotice=window.__hrSaveRecoveryNeeded?'<div class="notice bad">기존 저장 데이터를 읽지 못했습니다. 자동 덮어쓰기를 차단해 원본을 보존했습니다. 저장소 상태를 확인하거나 아래 새 게임을 직접 선택하세요.</div>':window.__hrSaveRecovered?'<div class="notice warn">원래 저장을 읽지 못해 마지막 정상 백업에서 복구했습니다. 목장 상태를 확인하세요.</div>':window.__hrSaveWriteError?'<div class="notice bad">저장에 실패했습니다. 브라우저 저장 공간을 확인하세요.</div>':'';$('root').innerHTML=header()+storageNotice+nav()+content+footer()}
+function resetGame(){
+  if(!confirm('기존 게임 저장과 복구 백업을 삭제하고 새 게임을 시작할까요? 삭제 후 복구할 수 없습니다.'))return;
+  try{localStorage.removeItem(SAVE_KEY);localStorage.removeItem(SAVE_BACKUP_KEY)}
+  catch(e){return alert('저장 데이터 삭제에 실패했습니다. 브라우저 설정을 확인하세요.')}
+  window.__hrmem=null;location.reload();
+}
 
 
 // ===== 19.7 STARTER FLOW PATCH: start/setup only =====
@@ -577,6 +629,7 @@ train=function(id,type){
   save();render();
 };
 advanceDay=function(silent=false){
+  if(!state.startDone)return _hr20_4_advanceDay();
   // Commit all month-end automatic education and expenses before moving the clock.
   if(state.day===30){
     const F=HorseRanchFoalEducation,month=monthKey();
@@ -592,16 +645,19 @@ advanceDay=function(silent=false){
     const paid=F.settle(state,month);
     if(paid.due)log(`${month} 교육·조교비 월말 정산: ${money(paid.paid)}${paid.unpaid?' · 미납 '+money(paid.unpaid):''}`);
   }
+  const previousBatch=HR_BATCH_DAY;
   HR_BATCH_DAY=true;
-  try{_hr20_4_advanceDay()}finally{HR_BATCH_DAY=false}
+  try{_hr20_4_advanceDay()}finally{HR_BATCH_DAY=previousBatch}
   if(!silent){save();render()}
 };
 advanceWeek=function(){
-  HR_BATCH_DAY=true;try{for(let i=0;i<7;i++)advanceDay(true)}finally{HR_BATCH_DAY=false}
+  const previousBatch=HR_BATCH_DAY;
+  HR_BATCH_DAY=true;try{for(let i=0;i<7;i++)advanceDay(true)}finally{HR_BATCH_DAY=previousBatch}
   save();render();
 };
 function advanceMonth(){
-  HR_BATCH_DAY=true;try{for(let i=0;i<30;i++)advanceDay(true)}finally{HR_BATCH_DAY=false}
+  const previousBatch=HR_BATCH_DAY;
+  HR_BATCH_DAY=true;try{for(let i=0;i<30;i++)advanceDay(true)}finally{HR_BATCH_DAY=previousBatch}
   save();render();
 }
 const _hr20_4_normalize=normalize;
