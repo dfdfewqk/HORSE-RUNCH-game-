@@ -201,8 +201,13 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
   meta.crisisMonths=stillInCrisis?meta.crisisMonths+1:0;
   let safetySupport=0;
   // Every NPC ranch survives downturns; reserve is explicit in the ledger.
-  if(meta.crisisMonths>=3&&count>0){
-   const minimum=4*count*CONFIG.monthlyUpkeep;
+  if(meta.crisisMonths>=3){
+   // An empty ranch must be able to afford the first existing experienced
+   // newcomer on the next annual turnover, not receive an imaginary horse.
+   const empty=!(ranch.horses||[]).length;
+   const minimum=empty
+    ?recruitmentCost({experienced:true})+CONFIG.minRanchHorses*CONFIG.monthlyUpkeep*3
+    :4*count*CONFIG.monthlyUpkeep;
    safetySupport=Math.max(0,minimum-n(ranch.funds));
    ranch.funds+=safetySupport;
    meta.totalSafetySupport+=safetySupport;
@@ -212,7 +217,7 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
  }
  e.lastMonth=month;
  const report={month,playerBill,playerPaid:payment,playerUnpaid:e.player.unpaid,npcSummary:summary,npcSales:sold};
- e.recent.push({month,playerBill,playerPaid:payment,npcSales:sold.length,crisis:summary.filter(s=>['위기','회생'].includes(s.status)).length});
+ e.recent.push({month,playerBill,playerPaid:payment,npcSales:sold.length,crisis:summary.filter(s=>['위기','회생'].includes(s.status)).length,safetySupport:summary.reduce((sum,s)=>sum+s.safetySupport,0)});
  e.recent=e.recent.slice(-12);
  return{applied:true,...report};
 }
