@@ -120,7 +120,7 @@ function start(game){
   const reloaded=boot([...g.storage]);
   assert.equal(reloaded.run('HorseRanchConsignment.active()[0].specialRemaining'),budget-120000);
   reloaded.run('advanceWeek()');
-  assert.equal(reloaded.run('state.hrConsignment.trainingWorld.contracts[0].status'),'done','a seven-day course should finish');
+  assert.equal(reloaded.run('HorseRanchConsignment.active()[0].specialJobs[0].status'),'completed','a seven-day special-training contract should finish');
   assert.deepEqual(reloaded.errors,[]);
   console.log('OK owner-funded facility course, duplicate booking blocked, school completion');
 }
