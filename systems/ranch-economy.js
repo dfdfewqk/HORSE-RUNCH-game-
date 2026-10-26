@@ -82,7 +82,7 @@ function creditFinishedRaces(world){
  * incumbent becomes ineligible or a challenger clearly outperforms it.
  * Breeding is owned by the lifecycle/education systems; no NPC mating here.
  */
-const coreKey=h=>String(h?.id);
+const coreKey=h=>String(h&&typeof h==='object'?h.id:h);
 const coreDay=w=>(n(w.year)-1)*360+(n(w.month)-1)*30+n(w.day);
 function racingValue(h,w){
  const rating=Number.isFinite(Number(h.rating))&&h.rating!=null?n(h.rating):
