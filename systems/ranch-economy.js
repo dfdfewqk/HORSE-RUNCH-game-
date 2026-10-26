@@ -5,6 +5,9 @@
 (function(root){
 'use strict';
 const CONFIG=Object.freeze({monthlyUpkeep:150000,npcSessionFee:75000,runwayWatch:6,runwayCrisis:3,runwayRecovery:1,minRanchHorses:3,transferDiscount:.55});
+// Deliberately lightweight NPC behavior: preserve a viable league, no AI manager.
+// Target cash buffers restrict optional recruitment, not essential horse care.
+const RESERVE_MONTHS=Object.freeze({'그랜드 스터드':6,'블루힐 팜':4,'윈드필드 목장':4,'노스밸리 목장':6,'레드크라운 목장':3});
 const n=x=>Number.isFinite(Number(x))?Math.max(0,Number(x)):0;
 const monthOf=s=>`${s.year}-${s.month}`;
 const monthKey=s=>monthOf(s);
@@ -24,6 +27,7 @@ function ensure(world){
   if(!Number.isFinite(Number(ranch.funds)))ranch.funds=70000000; // 20.10's implicit NPC purse, assigned only once
   ranch.funds=n(ranch.funds);
   if(!e.ranches[ranch.name])e.ranches[ranch.name]={totalUpkeep:0,totalTraining:0,totalPrizes:0,totalSales:0,totalRecruitment:0};
+  const ledger=e.ranches[ranch.name];ledger.crisisMonths=Math.max(0,Math.floor(n(ledger.crisisMonths)));ledger.totalSafetySupport=n(ledger.totalSafetySupport);
  }
  return e;
 }
@@ -115,7 +119,20 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
    const actual=tryRealSale(world,ranch,priceFn,soldIds);
    if(actual)sold.push(actual);
   }
-  summary.push({name:ranch.name,paid,bill,unpaid:meta.unpaid,remaining:n(ranch.funds),status:status(ranch.funds,ranch.horses.length).status});
+  // Small explicit operating safety net after three consecutive distressed
+  // settlements. This is a game-world support entry, not invisible sales or
+  // elite horse grants. Old/normal NPC farms still follow their own budgets.
+  const stillInCrisis=['위기','회생'].includes(status(ranch.funds,ranch.horses.length).status);
+  meta.crisisMonths=stillInCrisis?meta.crisisMonths+1:0;
+  let safetySupport=0;
+  if(ranch.named&&meta.crisisMonths>=3&&count>0){
+   const minimum=4*count*CONFIG.monthlyUpkeep;
+   safetySupport=Math.max(0,minimum-n(ranch.funds));
+   ranch.funds+=safetySupport;
+   meta.totalSafetySupport+=safetySupport;
+   meta.crisisMonths=0;
+  }
+  summary.push({name:ranch.name,paid,bill,unpaid:meta.unpaid,remaining:n(ranch.funds),safetySupport,status:status(ranch.funds,ranch.horses.length).status});
  }
  e.lastMonth=month;
  const report={month,playerBill,playerPaid:payment,playerUnpaid:e.player.unpaid,npcSummary:summary,npcSales:sold};
@@ -124,9 +141,17 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
  return{applied:true,...report};
 }
 function recruitmentCost(spec){return spec.elite?22000000:spec.experienced?15000000:8000000;}
-function canRecruit(ranch,fee){const balance=n(ranch.funds),reserve=upcomingUpkeep(ranch)*3;return status(balance,ranch.horses?.length).status==='정상'&&balance>=fee+reserve;}
+function canRecruit(ranch,fee){
+ const balance=n(ranch.funds);
+ const active=(ranch.horses||[]).filter(h=>h&&!h.retired&&n(h.age)>=2).length;
+ // A prestigious ranch with fewer than three active racers can rebuild with
+ // low-cost arrivals; never bypass the actual purchase charge.
+ const rebuild=!!ranch.named&&active<3;
+ const months=rebuild?2:(RESERVE_MONTHS[ranch.name]||3);
+ return (status(balance,ranch.horses?.length).status==='정상'||rebuild)&&balance>=n(fee)+upcomingUpkeep(ranch)*months;
+}
 function chargeRecruit(world,ranch,cost){const e=ensure(world);const fee=n(cost);if(!canRecruit(ranch,fee))return false;ranch.funds-=fee;e.ranches[ranch.name].totalRecruitment+=fee;return true;}
-const api=Object.freeze({CONFIG,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,recruitmentCost,canRecruit,chargeRecruit});
+const api=Object.freeze({CONFIG,RESERVE_MONTHS,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,recruitmentCost,canRecruit,chargeRecruit});
 root.HorseRanchEconomy=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

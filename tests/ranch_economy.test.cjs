@@ -34,4 +34,26 @@ const noBuyer={year:1,month:1,day:30,ranchName:'PLAYER',money:0,horses:[],npcs:[
 E.closeMonth(noBuyer,'1-1',0,{'고립된 NPC':4},()=>4000000);
 assert.equal(noBuyer.npcs[0].funds,0,'a sale without a real buyer must not create cash');
 assert.equal(noBuyer.npcs[0].horses.length,4,'failed sale preserves horse ownership');
-console.log('HORSE_RANCH_20_13_ECONOMY_PASS');
+// 20.14: repeated insolvency does not wipe out named ranches.
+const basic=[horse(70),horse(71),horse(72),horse(73)];
+const crisis={year:1,month:1,day:30,ranchName:'PLAYER',money:0,horses:[],npcs:[{name:'그랜드 스터드',named:true,funds:0,horses:basic,stalls:100}],races:[]};
+const meta=E.ensure(crisis).ranches['그랜드 스터드'];
+for(let month=1;month<=3;month++){
+ const done=E.closeMonth(crisis,`1-${month}`,0,{'그랜드 스터드':4},()=>4000000);
+ assert.equal(done.applied,true);
+}
+assert.equal(crisis.npcs[0].horses.length,4,'named ranch survives even without buyers');
+assert.equal(crisis.npcs[0].funds,4*4*E.CONFIG.monthlyUpkeep);
+assert.equal(meta.totalSafetySupport,4*4*E.CONFIG.monthlyUpkeep);
+assert.equal(E.closeMonth(crisis,'1-3',0,{},()=>0).applied,false,'support cannot be duplicated');
+assert.equal(E.RESERVE_MONTHS['레드크라운 목장'],3);
+assert.equal(E.RESERVE_MONTHS['그랜드 스터드'],6);
+// A named farm with no active horses is allowed a modest rebuild only if it
+// can actually afford the horse plus two months of care.
+const rebuild={name:'레드크라운 목장',named:true,funds:10000000,horses:[{...horse(81),retired:true}],stalls:30};
+assert.equal(E.canRecruit(rebuild,8000000),true);
+assert.equal(E.canRecruit(rebuild,15000000),false);
+const before=rebuild.funds;
+assert.equal(E.chargeRecruit({year:1,month:1,day:1,npcs:[rebuild],horses:[]},rebuild,8000000),true);
+assert.equal(rebuild.funds,before-8000000,'no free rookie horses');
+console.log('HORSE_RANCH_20_14_NPC_SAFETY_PASS');
