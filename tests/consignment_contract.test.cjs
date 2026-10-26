@@ -166,4 +166,20 @@ function start(game){
   assert.deepEqual(b.errors,[]);
   console.log('OK consignment contract day-by-day equals 30-day batch');
 }
+{
+  const g=boot();start(g);
+  const offer=g.run('HorseRanchConsignment.offers()[0]');
+  g.run('hrConsignmentAccept('+JSON.stringify(offer.owner.name)+','+offer.horse.id+',"race")');
+  const beforeBudget=g.run('HorseRanchConsignment.active()[0].specialRemaining'),beforeMoney=g.run('state.money');
+  const first=g.run('HorseRanchConsignment.rider(HorseRanchConsignment.active()[0],"j1",7)');
+  assert.equal(first.ok,true,first.reason);
+  assert.equal(g.run('HorseRanchConsignment.active()[0].specialRemaining'),beforeBudget-75000);
+  assert.equal(g.run('state.money'),beforeMoney,'rider special training never debits player directly');
+  const second=g.run('HorseRanchConsignment.rider(HorseRanchConsignment.active()[0],"j1",7)');
+  assert.equal(second.ok,false,'a jockey cannot be double-booked');
+  g.run('advanceWeek()');
+  assert.equal(g.run('state.hrConsignment.trainingWorld.bookings[0].status'),'done');
+  assert.deepEqual(g.errors,[]);
+  console.log('OK owner-funded rider sessions, no duplicated jockey, scheduled completion');
+}
 console.log('PASS consignment contract integration');
