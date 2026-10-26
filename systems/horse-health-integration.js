@@ -66,6 +66,16 @@ detailBody=function(h,tab,recent){
  return html+'<div class="notice"><b>수의사 자동 관리</b> · '+escapeHtml(a.name)+
   ' · '+escapeHtml(labels[a.phase]||'상태 확인 중')+' · 경주 출전 제한</div>';
 };
+const beforeDashboard=dashboard;
+dashboard=function(){
+ let html=beforeDashboard.apply(this,arguments);
+ const report=state.hrHealthLastReport;
+ if(report&&getDay()-Number(report.day)<=30&&getDay()>=Number(report.day)){
+  html+='<div class="notice"><b>최근 수의사 경과 보고</b> · 치료·재활 완료 '+
+   Number(report.completed)+'건'+(report.careerEndings?' · 은퇴 진로 판단 필요 '+Number(report.careerEndings)+'건':'')+'</div>';
+ }
+ return html;
+};
 const beforeDay=advanceDay;
 advanceDay=function(...args){
  // Legacy injury durations may be supplied by saved games or other modules.
