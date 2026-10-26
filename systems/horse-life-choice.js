@@ -7,20 +7,25 @@ function ensure(w){
  for(const k of ['pending','history','placed'])if(!Array.isArray(x[k]))x[k]=[];
  return x;
 }
-function siteCount(w){return(w.horses||[]).filter(h=>h?.hrAftercare?.status!=='board').length;}
+function siteCount(w){return(w.horses||[]).filter(h=>h?.hrAftercare?.status!=='board'&&!(h?.hrAftercare?.status==='pending'&&h.hrAftercare?.previousStatus==='board')).length;}
 function find(w,id){return(w.horses||[]).find(h=>String(h.id)===String(id));}
 function hasBooking(w,id){return(w.breedings||[]).some(b=>String(b.mareId)===String(id)||String(b.sireId)===String(id));}
 function queue(w,id,reason='경주 은퇴'){
  const h=find(w,id);if(!h)return{ok:false,reason:'말을 찾을 수 없습니다.'};
- const s=ensure(w);h.retired=true;
+ const s=ensure(w),oldStatus=h.hrAftercare?.status;
+ h.retired=true;
+ // A newly retired horse cannot keep an active race registration.
+ if(Array.isArray(w.registrations))w.registrations=w.registrations.filter(x=>String(x.horseId)!==String(id));
  if(!s.pending.some(x=>String(x.id)===String(id)))s.pending.push({id:h.id,name:h.name,reason,year:w.year});
- h.hrAftercare={...(h.hrAftercare||{}),status:'pending'};
+ h.hrAftercare={...(h.hrAftercare||{}),previousStatus:oldStatus==='pending'?h.hrAftercare?.previousStatus:oldStatus,status:'pending'};
  return{ok:true};
 }
 function decide(w,id,mode,opts={}){
  const s=ensure(w),h=find(w,id);
  if(!h||!h.retired||!s.pending.some(x=>String(x.id)===String(id)))return{ok:false,reason:'결정 대기 중인 은퇴마가 아닙니다.'};
  if(!['breeding','keep','board','place'].includes(mode))return{ok:false,reason:'선택할 수 없는 진로입니다.'};
+ if(['breeding','keep'].includes(mode)&&h.hrAftercare?.previousStatus==='board'&&siteCount(w)>=Number(w.stalls||0))
+  return{ok:false,reason:'목장 마방이 가득 찼습니다. 다른 말의 공간을 확보하거나 외부 위탁을 유지해 주세요.'};
  if(['board','place'].includes(mode)&&hasBooking(w,id))return{ok:false,reason:'예정된 출산 이후 외부로 보낼 수 있습니다.'};
  if(mode==='place'&&(w.registrations||[]).some(x=>String(x.horseId)===String(id)))return{ok:false,reason:'출전 등록을 먼저 정리해야 합니다.'};
  if(mode==='place'){
