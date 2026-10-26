@@ -146,6 +146,16 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
  e.recent=e.recent.slice(-12);
  return{applied:true,...report};
 }
+function buyerForPlayerSale(world,horse,price){
+ if(!horse)return null;
+ const cost=n(price);
+ return (world.npcs||[]).filter(r=>{
+  const capacity=Math.min(100,n(r.stalls)||100);
+  return (r.horses||[]).length<capacity &&
+   n(r.funds)>=cost+upcomingUpkeep(r)*3 &&
+   (r.horses||[]).every(h=>String(h.id)!==String(horse.id));
+ }).sort((a,b)=>n(b.funds)-n(a.funds)||a.name.localeCompare(b.name))[0]||null;
+}
 function recruitmentCost(spec){return spec.elite?22000000:spec.experienced?15000000:8000000;}
 function canRecruit(ranch,fee){
  const balance=n(ranch.funds);
@@ -157,7 +167,7 @@ function canRecruit(ranch,fee){
  return (status(balance,ranch.horses?.length).status==='정상'||rebuild)&&balance>=n(fee)+upcomingUpkeep(ranch)*months;
 }
 function chargeRecruit(world,ranch,cost){const e=ensure(world);const fee=n(cost);if(!canRecruit(ranch,fee))return false;ranch.funds-=fee;e.ranches[ranch.name].totalRecruitment+=fee;return true;}
-const api=Object.freeze({CONFIG,RESERVE_MONTHS,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,recruitmentCost,canRecruit,chargeRecruit});
+const api=Object.freeze({CONFIG,RESERVE_MONTHS,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,buyerForPlayerSale,recruitmentCost,canRecruit,chargeRecruit});
 root.HorseRanchEconomy=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
