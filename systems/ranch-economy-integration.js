@@ -28,7 +28,14 @@ const priorRace=runRace;
 runRace=function(...args){
  const result=priorRace.apply(this,args);
  const r=state.races.find(x=>x.id===args[0]);
- if(r?.state==='finished'&&!r.npcPurseSettled){E.creditFinishedRaces(state);save();}
+ if(r?.state==='finished'&&!r.npcPurseSettled){
+  // Capture ownership at the finish before any later market/auction transfer.
+  if(!r.npcPurseOwners){
+   const owners=new Map();for(const n of state.npcs||[])for(const h of n.horses||[])owners.set(String(h.id),n.name);
+   r.npcPurseOwners=Object.fromEntries((r.result||[]).filter(row=>owners.has(String(row.horseId))).map(row=>[String(row.horseId),owners.get(String(row.horseId))]));
+  }
+  E.creditFinishedRaces(state);save();
+ }
  return result;
 };
 const priorDay=advanceDay;
