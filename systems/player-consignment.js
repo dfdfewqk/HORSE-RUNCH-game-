@@ -45,7 +45,7 @@ function accept(ownerName,horseId,type){
   s.contracts.push(c);
   return{ok:true,contract:c};
 }
-function proxy(){return{year:state.year,month:state.month,day:state.day,hr15:ensure().trainingWorld,registrations:state.registrations};}
+function proxy(){return{year:state.year,month:state.month,day:state.day,hr15:ensure().trainingWorld,registrations:state.registrations,races:state.races};}
 function school(c,kind,days){
   if(!c||c.status!=='active')return{ok:false,reason:'유효한 위탁 계약이 아닙니다.'};
   if(!['development','race'].includes(c.type))return{ok:false,reason:'일반 관리 계약에는 특별 교육 권한이 없습니다.'};
@@ -71,6 +71,7 @@ function rider(c,jid,days){
   if(!['development','race'].includes(c.type))return{ok:false,reason:'일반 관리 계약에는 특별 조교 권한이 없습니다.'};
   if(c.specialJobs?.some(j=>j.status==='active'))return{ok:false,reason:'진행 중인 특별 조교가 있습니다.'};
   const j=getJockey(jid),duration=Number(days),cost=Math.ceil(duration/7)*CFG.riderWeekFee;
+  if(j&&I.ensureWorld(state).bookings.some(b=>b.status==='active'&&String(b.jockeyId)===String(j.id)))return{ok:false,reason:'플레이어 보유마를 조교 중인 기수는 중복 예약할 수 없습니다.'};
   if(dayOf(state)+duration>c.ends)return{ok:false,reason:'계약 기간을 넘기는 조교는 신청할 수 없습니다.'};
   if(cost>c.specialRemaining)return{ok:false,reason:'NPC 마주의 특별 조교 예산이 부족합니다.'};
   const r=I.scheduleRider(proxy(),c.horse,j,duration);
