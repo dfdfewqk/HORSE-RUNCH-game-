@@ -45,12 +45,12 @@ assert.equal(A.closeAuction(poor,6).sold,0,'zero-cash NPC cannot receive free mo
 assert.equal(poor.npcs[1].funds,0);
 assert.equal(A.closeAuction(poor,6).applied,false);
 const buy={year:1,month:1,day:5,money:4000000,stalls:1,horses:[],
- npcs:[ranch('Seller',[60],5000000)],
- ranchAuction:{current:{status:'open',day:5,week:0,lots:[{horseId:60,seller:'Seller',sellerKind:'npc',reserve:1000000,playerBid:0}],consignment:null},history:[]}};
-assert.equal(A.placeBid(buy,60,()=>1000000).ok,true);
+ npcs:[ranch('Seller',[60,61,62,63,64],5000000)],
+ ranchAuction:{current:{status:'open',day:5,week:0,lots:[{horseId:64,seller:'Seller',sellerKind:'npc',reserve:1000000,playerBid:0}],consignment:null},history:[]}};
+assert.equal(A.placeBid(buy,64,()=>1000000).ok,true);
 assert.equal(A.closeAuction(buy,6).won,1);
 assert.equal(buy.horses.length,1);
-assert.equal(buy.npcs[0].horses.length,0);
+assert.equal(buy.npcs[0].horses.length,4,'sell without liquidating NPC core horses');
 assert.equal(buy.money,3000000);
 assert.equal(buy.npcs[0].funds,6000000);
 assert.equal(E.buyerForPlayerSale({npcs:[ranch('Empty',[],0)]},horse(8),1000000),null);
