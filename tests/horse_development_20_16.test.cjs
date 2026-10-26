@@ -98,4 +98,44 @@ assert.ok(runner.speed<age11+1,'aged physical stats are not silently restored');
 const restored=JSON.parse(JSON.stringify(decade));
 assert.equal(A.advanceYear(restored).applied,false,'loaded annual aging cannot repeat');
 assert.equal(L.advanceYear(restored).applied,false,'loaded mortality cannot repeat');
-console.log('HORSE_RANCH_20_16_DEVELOPMENT_PASS',JSON.stringify({grandparentInfluence,individualVariation:seen.size,lowestHoof:lowest,tenYearAge:runner.age}));
+
+function setCalendar(w,absolute){
+ w.year=Math.floor((absolute-1)/360)+1;
+ w.month=Math.floor(((absolute-1)%360)/30)+1;
+ w.day=((absolute-1)%30)+1;
+}
+const schoolHorse=specimen('INJ',1,{...known,sensitivity:80});
+schoolHorse.foalEducation={bornAtDay:0};
+const schoolWorld={year:1,month:1,day:1,horses:[schoolHorse],npcs:[],registrations:[],races:[]};
+setCalendar(schoolWorld,600);
+const contract=I.enroll(schoolWorld,schoolHorse,'ground',30);
+assert.equal(contract.ok,true);
+setCalendar(schoolWorld,601);
+I.schoolAdvance(schoolWorld,()=>schoolHorse);
+const progressBeforeInjury=contract.contract.progress;
+schoolHorse.injury=4;
+setCalendar(schoolWorld,602);
+I.schoolAdvance(schoolWorld,()=>schoolHorse);
+assert.equal(contract.contract.progress,progressBeforeInjury,'injury halts scheduled education');
+assert.ok(contract.contract.report,'the training facility reports an injury');
+assert.equal(I.decide(schoolWorld,schoolHorse.id,'return').ok,true);
+I.schoolAdvance(schoolWorld,()=>schoolHorse);
+assert.equal(contract.contract.progress,progressBeforeInjury,'early return never awards a phantom lesson');
+assert.equal(contract.contract.status,'done');
+assert.equal(schoolHorse.hrSchooling.courseHistory.at(-1).returnedEarly,true);
+
+let incomplete30=0;
+for(let id=4500;id<4900;id++){
+ const x=specimen(id,1,{...known,sensitivity:50,independence:50,excitability:50,compliance:50});
+ x.foalEducation={bornAtDay:0};
+ const w={year:1,month:1,day:1,horses:[x],npcs:[],registrations:[],races:[]};
+ setCalendar(w,600);
+ const result=I.enroll(w,x,'ground',30);
+ assert.equal(result.ok,true);
+ for(let d=601;d<=630;d++){setCalendar(w,d);I.schoolAdvance(w,()=>x);}
+ if(x.hrSchooling.courseHistory.at(-1).result!=='수료')incomplete30++;
+}
+assert.ok(incomplete30>5&&incomplete30<200,'30-day course is not guaranteed, observed non-completions='+incomplete30);
+assert.ok(I.fee('ground',30)>I.fee('ground',14),'longer contracts retain a real cost trade-off');
+
+console.log('HORSE_RANCH_20_16_DEVELOPMENT_PASS',JSON.stringify({grandparentInfluence,individualVariation:seen.size,lowestHoof:lowest,tenYearAge:runner.age,incomplete30}));
