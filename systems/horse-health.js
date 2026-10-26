@@ -8,7 +8,7 @@
 const WEAKNESSES=Object.freeze({leg_load:'다리 부담에 취약',slow_recovery:'회복이 느림'});
 const DIAGNOSES=Object.freeze({
  wound:'찰과상·열상',hoof:'발굽 타박·농양',joint:'관절 염증',
- bucked_shins:'경골·중수골 과부하',stress_fracture:'피로골절',
+ bucked_shins:'중수골 골막염',stress_fracture:'피로골절',
  chip_fracture:'관절 내 골편',severe_fracture:'중증 골절',
  tendon:'굴건 손상',ligament:'인대 손상',myopathy:'운동성 근육 손상',
  eiph:'운동유발 폐출혈',respiratory:'호흡기 감염',
