@@ -55,12 +55,15 @@ function rearingDay(world,day){
   const r=ensureRearing(h);if(!r||r.lastDay===day)continue;
   const young=number(h.age)<2;
   const crowded=young&&info.overcrowded;
-  if(crowded){affected++;r.readiness=clamp(r.readiness-1.5,35,100);}
+  if(crowded){affected++;r.readiness=clamp(r.readiness-1.5,35,100);
+   // Reduced daily condition is temporary and recovers with normal care.
+   if(Number.isFinite(Number(h.condition)))h.condition=Math.min(number(h.condition),Math.max(55,Math.round(r.readiness)));
+  }
   else r.readiness=clamp(r.readiness+2,35,100);
   // The existing natural +3 age milestones are delayed, not permanently
   // deleted, when a young horse has spent prolonged time in cramped pasture.
   const milestone=number(h.foalEducation.ageMilestone);
-  if(milestone>number(r.lastMilestone)&&young===false || milestone>number(r.lastMilestone)&&young){
+  if(milestone>number(r.lastMilestone)){
    const shortage=r.readiness<70?(r.readiness<50?2:1):0;
    for(const k of ['speed','stamina','power']){
     const before=number(h[k]),defer=Math.min(shortage,Math.max(0,before-40));
