@@ -63,6 +63,12 @@ continueAfterOpeningRace=function(){
  log('무료 랜덤 암말 지급 · '+gift1.name+' ('+gift1.distanceBand+'), '+gift2.name+' ('+gift2.distanceBand+')');
  save();render();
 };
+const previousStarterCard=openingStarterCard;
+openingStarterCard=function(h){
+ const html=previousStarterCard(h);
+ if(state.hrAgreedCoreVersion!==1)return html;
+ return html.replace('수말 · '+age(h)+'세','수말 · '+age(h)+'세 · OP급');
+};
 const oldIntro=intro;
 intro=function(){
  const markup=oldIntro();
