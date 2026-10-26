@@ -50,6 +50,8 @@ function lineageRecord(h,year,owner,achievements){
     deathYear:year,deathReason:'자연사',lastRanch:owner,
     fatherId:h.fatherId??null,motherId:h.motherId??null,
     parents:{sire:h.parents?.sire||'기초 계통',dam:h.parents?.dam||'기초 계통'},
+    // Retain only an actually recorded temperament. Missing data stays unknown.
+    hrTemperament:h.hrTemperament&&typeof h.hrTemperament==='object'?{...h.hrTemperament}:null,
     distanceBand:h.distanceBand||null,coat:h.coat||null,
     starts:Math.max(0,Number(h.starts)||0),wins:Math.max(0,Number(h.wins)||0),
     seconds:Math.max(0,Number(h.seconds)||0),thirds:Math.max(0,Number(h.thirds)||0),
@@ -60,6 +62,22 @@ function lineageRecord(h,year,owner,achievements){
     // Preserve only five compact recent rows to support legacy '5 wins' title rule.
     history:(h.history||[]).slice(0,5).map(x=>({year:x.year,month:x.month,day:x.day,grade:x.grade,dist:x.dist,place:x.place}))
   };
+}
+function archivePedigree(world,h,reason='판매',year=Math.floor(Number(world?.year)||1),owner=world?.ranchName||'플레이어 목장',achievements=null){
+  if(!world||!h)return null;
+  if(!Array.isArray(world.pedigreeArchive))world.pedigreeArchive=[];
+  const existing=world.pedigreeArchive.find(x=>String(x.id)===String(h.id));
+  if(existing)return existing; // Historical identity, not a new synthetic ancestor.
+  const row=lineageRecord(h,year,owner,achievements);
+  if(reason!=='자연사'){
+    row.archiveReason=reason;
+    row.deceased=false;
+    row.retired=!!h.retired;
+    row.deathYear=null;
+    row.deathReason=null;
+  }
+  world.pedigreeArchive.push(row);
+  return row;
 }
 function advanceYear(world,options={}){
   const clock=ensureWorld(world),year=Math.floor(Number(world.year)||1);
@@ -75,8 +93,7 @@ function advanceYear(world,options={}){
       const achievements=typeof options.getAchievements==='function'?options.getAchievements(h):h.careerAchievements;
       const title=typeof options.getTitle==='function'?options.getTitle(h):null;
       if(typeof options.archiveLegend==='function')options.archiveLegend(h,year);
-      const archived=lineageRecord(h,year,owner,achievements);
-      if(!world.pedigreeArchive.some(x=>String(x.id)===String(h.id)))world.pedigreeArchive.push(archived);
+      archivePedigree(world,h,'자연사',year,owner,achievements);
       if(world.selectedHorse!=null&&String(world.selectedHorse)===String(h.id))world.selectedHorse=null;
       if(world.selectedDam!=null&&String(world.selectedDam)===String(h.id))world.selectedDam=null;
       if(world.selectedSire!=null&&String(world.selectedSire)===String(h.id))world.selectedSire=null;
@@ -92,7 +109,7 @@ function advanceYear(world,options={}){
   clock.lastYear=year;clock.totalDeaths+=summary.deaths;
   return summary;
 }
-const api=Object.freeze({version:VERSION,CONFIG,targetAge,ensureHorse,ensureWorld,hasPendingBreeding,lineageRecord,advanceYear});
+const api=Object.freeze({version:VERSION,CONFIG,targetAge,ensureHorse,ensureWorld,hasPendingBreeding,lineageRecord,archivePedigree,advanceYear});
 root.HorseRanchLifeSpan=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

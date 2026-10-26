@@ -100,21 +100,28 @@ function schoolingTick(world,h,contract,day){
 function decide(world,id,choice){const c=occupied(world,id);if(!c||!c.report||c.report.decision)return{ok:false,reason:'조치할 교육 중간 보고가 없습니다.'};
  if(choice==='gentle'){c.mode='gentle';c.report.decision='gentle';return{ok:true,cost:0};}
  if(choice==='extend'){c.days+=7;c.ends+=7;c.report.decision='extend';const cost=fee(c.kind,7);return{ok:true,cost};}
- if(choice==='return'){c.report.decision='return';c.ends=dayOf(world);return{ok:true,cost:0};}
+ if(choice==='return'){c.report.decision='return';c.returnedEarly=true;c.ends=dayOf(world);return{ok:true,cost:0};}
  return{ok:false,reason:'지원하지 않는 조치입니다.'};
 }
 function finishSchool(world,h,c){const s=ensureSchool(h),def=COURSE[c.kind];
  const min=Math.min(...def.keys.map(k=>s.skills[k]));
- const state=min>=65?'수료':min>=28?'부분 수료':'미수료';
+ // Course completion is a separate observed assessment, not a guaranteed
+ // reward for selecting a 30-day slot. This is provisional calibration.
+ const t=h.hrTemperament||{};
+ const difficulty=clamp((n(t.sensitivity)+n(t.independence)+n(t.excitability)-n(t.compliance))/240,-.35,.65);
+ const assessmentChance=clamp(.93-s.stress/300-Math.max(0,difficulty)*.20,.55,.98);
+ const assessmentPassed=roll(`${h.id}|${c.kind}|${c.starts}|assessment`)<assessmentChance;
+ const state=min>=65&&!c.returnedEarly&&assessmentPassed?'수료':min>=28?'부분 수료':'미수료';
  if(state==='수료'&&!s.completed.includes(c.kind))s.completed.push(c.kind);
- const row={horseId:h.id,kind:c.kind,days:c.progress,result:state,day:dayOf(world),safe:!!s.safe};
+ const row={horseId:h.id,kind:c.kind,days:c.progress,result:state,day:dayOf(world),safe:!!s.safe,assessmentPassed,returnedEarly:!!c.returnedEarly};
  s.courseHistory.push(row);s.courseHistory=s.courseHistory.slice(-20);
  ensureWorld(world).history.push(row);ensureWorld(world).history=ensureWorld(world).history.slice(-60);
  c.status='done';return row;
 }
 function schoolAdvance(world,horseOf){const s=ensureWorld(world),day=dayOf(world),finished=[];
  for(const c of s.contracts){if(c.status!=='active')continue;const h=horseOf(c.horseId);if(!h){c.status='cancelled';continue;}
-  if(day>c.starts&&day<=c.ends&&c.lastTickDay!==day){schoolingTick(world,h,c,day);c.lastTickDay=day;}
+  if(h.injury&&!c.report){c.report={reason:'부상 회복 중 교육을 일시 중단합니다.',issued:day,decision:null};c.reportDay=day;}
+  if(day>c.starts&&day<=c.ends&&c.lastTickDay!==day&&!c.returnedEarly&&!h.injury){schoolingTick(world,h,c,day);c.lastTickDay=day;}
   // If the owner doesn't respond, fall back to gentle instruction rather than deadlocking time.
   if(c.report&&!c.report.decision&&day-c.report.issued>=4){c.report.decision='automatic-gentle';c.mode='gentle';}
   if(day>=c.ends){finished.push(finishSchool(world,h,c));}
@@ -171,6 +178,18 @@ function riderAdvance(world,horseOf,jockeyOf,relationOf){const day=dayOf(world),
  }
  return out;
 }
+// Baseline daily clock drains hoof condition without any recovery path.
+// Existing care stays automatic: a bounded weekly hoof check prevents permanent
+// collapse over years. 18 is a provisional game-balance value, not a stat bonus.
+function routineCare(h,day){
+ if(!h||!Number.isFinite(Number(h.hoof))||!Number.isInteger(day)||day<1||day%7!==0)return false;
+ if(!h.hrRoutineCare||typeof h.hrRoutineCare!=='object')h.hrRoutineCare={lastHoofCareDay:0};
+ if(h.hrRoutineCare.lastHoofCareDay===day)return false;
+ h.hrRoutineCare.lastHoofCareDay=day;
+ const previous=clamp(Number(h.hoof),0,100);
+ h.hoof=clamp(previous+18,0,100);
+ return h.hoof>previous;
+}
 function raceReaction(h,j,rel,seed){if(!h?.hrTemperament||!j)return{type:'none',minor:0,strong:0,delay:0,paceWaste:0};
  ensureRelation(rel,h,j);const s=rel.hr15;if(!s||s.unknown)return{type:'none',minor:0,strong:0,delay:0,paceWaste:0};
  const b=REL_BASE[s.tier],stress=n(h.hrSchooling?.stress),skill=n(h.hrSchooling?.skills?.pace);
@@ -179,6 +198,6 @@ function raceReaction(h,j,rel,seed){if(!h?.hrTemperament||!j)return{type:'none',
  const u=roll(seed+'|reaction');const type=u<strong?'strong':u<strong+minor?'minor':'none';
  return{type,minor,strong,delay:type==='strong'?1.2:type==='minor'?.25:0,paceWaste:type==='strong'?.09:type==='minor'?.025:0};
 }
-const api=Object.freeze({TRAITS,COURSE,REL_BASE,ensureLegacyTemperament,dayOf,ageDays,legacy,bornTemperament,ensureWorld,ensureSchool,occupied,booked,fee,canEnroll,enroll,decide,schoolAdvance,ensureRelation,observe,scheduleRider,riderAdvance,raceReaction});
+const api=Object.freeze({TRAITS,COURSE,REL_BASE,ensureLegacyTemperament,dayOf,ageDays,legacy,bornTemperament,ensureWorld,ensureSchool,occupied,booked,fee,canEnroll,enroll,decide,schoolAdvance,ensureRelation,observe,scheduleRider,riderAdvance,routineCare,raceReaction});
 root.HorseRanchInteraction=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
