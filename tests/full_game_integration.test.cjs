@@ -18,6 +18,7 @@ function boot(initial=null,seed=2786){
   const math=Object.create(Math);
   math.random=()=>{random=(Math.imul(random,1664525)+1013904223)>>>0;return random/4294967296;};
   const document={
+    head:{appendChild(){}},body:{appendChild(){},removeChild(){}},
     getElementById:id=>({value:id==='ranchName'?'통합테스트목장':'',
       get innerHTML(){return ''},set innerHTML(x){},
       scrollIntoView(){},style:{},appendChild(){}}),
