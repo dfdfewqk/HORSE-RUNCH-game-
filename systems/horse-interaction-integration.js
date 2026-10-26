@@ -110,8 +110,8 @@ advanceDay=function(...args){
  // Daily light exercise is automatic. Stat improvement only on a bounded
  // weekly session, reusing 20.4 trainingGain and the existing invoice ledger.
  let gains=0;
- for(const h of state.horses){const s=I.ensureSchool(h);if(s)s.stress=clamp(s.stress-0.7,0,100);
-  if(h.retired||h.injury||h.pregnantUntil||I.occupied(state,h.id)||age(h)<2||h.fatigue>=60)continue;
+ for(const h of state.horses){I.routineCare(h,today);const s=I.ensureSchool(h);if(s)s.stress=clamp(s.stress-0.7,0,100);
+  if(h.retired||h.injury||h.pregnantUntil||I.occupied(state,h.id)||age(h)<2||h.fatigue>=60||h.hoof<45)continue;
   if(today%7!==1)continue;
   const training=state.training;const key=monthKey();if(training.monthKey!==key){training.monthKey=key;training.used={};}
   const used=Number(training.used[h.id]||0);if(used>=4)continue;
@@ -120,7 +120,12 @@ advanceDay=function(...args){
   const cap=HorseRanchLifeCycle.effectiveCap(h,type);if(h[type]>=cap)continue;
   const probSeed=I.dayOf(state)+'|'+h.id+'|auto';let hashed=0;for(const c of probSeed){hashed=(Math.imul(hashed,31)+c.charCodeAt(0))>>>0;}
   const gain=Math.min(cap-h[type],F.trainingGain(h,type,()=>((hashed%10000)/10000)));
-  h[type]+=gain;training.used[h.id]=used+1;F.accrue(state,cost);gains+=gain;
+  h[type]+=gain;training.used[h.id]=used+1;
+  // A training session costs physical effort even when it yields no stat gain.
+  // Keep this separate from psychological schooling stress.
+  h.fatigue=clamp((Number(h.fatigue)||0)+9,0,100);
+  h.condition=clamp((Number(h.condition)||0)-2,25,100);
+  F.accrue(state,cost);gains+=gain;
  }
  if(completed.length||riders.length||gains){for(const row of completed)log(`${hById(row.horseId)?.name||'경주마'} ${I.COURSE[row.kind]?.name} ${row.result}${row.safe?' · 게이트 안전 적합':''}`);
   if(riders.length)log(`지정 기수 조교 ${riders.length}회 진행 · 긍정/부정 반응 기록`);
