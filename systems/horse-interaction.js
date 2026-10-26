@@ -171,6 +171,18 @@ function riderAdvance(world,horseOf,jockeyOf,relationOf){const day=dayOf(world),
  }
  return out;
 }
+// Baseline daily clock drains hoof condition without any recovery path.
+// Existing care stays automatic: a bounded weekly hoof check prevents permanent
+// collapse over years. 18 is a provisional game-balance value, not a stat bonus.
+function routineCare(h,day){
+ if(!h||!Number.isFinite(Number(h.hoof))||!Number.isInteger(day)||day<1||day%7!==0)return false;
+ if(!h.hrRoutineCare||typeof h.hrRoutineCare!=='object')h.hrRoutineCare={lastHoofCareDay:0};
+ if(h.hrRoutineCare.lastHoofCareDay===day)return false;
+ h.hrRoutineCare.lastHoofCareDay=day;
+ const previous=clamp(Number(h.hoof),0,100);
+ h.hoof=clamp(previous+18,0,100);
+ return h.hoof>previous;
+}
 function raceReaction(h,j,rel,seed){if(!h?.hrTemperament||!j)return{type:'none',minor:0,strong:0,delay:0,paceWaste:0};
  ensureRelation(rel,h,j);const s=rel.hr15;if(!s||s.unknown)return{type:'none',minor:0,strong:0,delay:0,paceWaste:0};
  const b=REL_BASE[s.tier],stress=n(h.hrSchooling?.stress),skill=n(h.hrSchooling?.skills?.pace);
@@ -179,6 +191,6 @@ function raceReaction(h,j,rel,seed){if(!h?.hrTemperament||!j)return{type:'none',
  const u=roll(seed+'|reaction');const type=u<strong?'strong':u<strong+minor?'minor':'none';
  return{type,minor,strong,delay:type==='strong'?1.2:type==='minor'?.25:0,paceWaste:type==='strong'?.09:type==='minor'?.025:0};
 }
-const api=Object.freeze({TRAITS,COURSE,REL_BASE,ensureLegacyTemperament,dayOf,ageDays,legacy,bornTemperament,ensureWorld,ensureSchool,occupied,booked,fee,canEnroll,enroll,decide,schoolAdvance,ensureRelation,observe,scheduleRider,riderAdvance,raceReaction});
+const api=Object.freeze({TRAITS,COURSE,REL_BASE,ensureLegacyTemperament,dayOf,ageDays,legacy,bornTemperament,ensureWorld,ensureSchool,occupied,booked,fee,canEnroll,enroll,decide,schoolAdvance,ensureRelation,observe,scheduleRider,riderAdvance,routineCare,raceReaction});
 root.HorseRanchInteraction=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
