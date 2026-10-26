@@ -24,6 +24,24 @@ buyHorse=function(id,owner){
  }
  return out;
 };
+// Legacy direct sale credited the player but destroyed the horse without a
+// paying buyer. Keep the old validation/achievement hooks and attach a real NPC.
+const priorSell=sellHorse;
+sellHorse=function(id){
+ const h=horse(id);
+ if(!h)return priorSell.apply(this,arguments);
+ const price=marketPrice(h),buyer=E.buyerForPlayerSale(state,h,price);
+ if(!buyer)return alert('이 말을 구매할 자금과 마방이 있는 NPC 목장이 없습니다.');
+ const beforeCount=state.horses.length,beforeCash=state.money;
+ const out=priorSell.apply(this,arguments);
+ if(state.horses.length===beforeCount-1&&!state.horses.includes(h)&&state.money===beforeCash+price){
+  buyer.funds-=price;buyer.horses.push(h);
+  const e=E.ensure(state),ledger=e.ranches[buyer.name];
+  ledger.totalPurchases=(ledger.totalPurchases||0)+price;
+  save();render();
+ }
+ return out;
+};
 const priorRace=runRace;
 runRace=function(...args){
  const result=priorRace.apply(this,args);
