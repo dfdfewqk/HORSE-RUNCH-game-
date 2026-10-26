@@ -144,7 +144,8 @@ function start(game){
   assert.ok(split.owner>=0 && split.ranch>=0 && split.jockey>=0);
   assert.equal(split.owner+split.ranch+split.jockey,run.result.payout);
   assert.equal(g.run('state.money'),balance+split.ranch);
-  assert.equal(g.run('state.npcs.find(n=>n.name==='+JSON.stringify(owner)+').funds'),npc+split.owner);
+  assert.ok(g.run('state.npcs.find(n=>n.name==='+JSON.stringify(owner)+').funds')>=npc+split.owner,'NPC may also win other places in the same race');
+  assert.equal(g.run('HorseRanchConsignment.active()[0].prizeForOwner'),split.owner,'loan prize credited exactly once');
   assert.equal(g.run('state.horses.length'),3);
   assert.equal(g.run('state.results.slice(-1)[0].consignmentSettlementId'),'hc-1');
   const second=g.run('HorseRanchConsignment.race(HorseRanchConsignment.active()[0],'+JSON.stringify(rr.id)+',"j1")');
