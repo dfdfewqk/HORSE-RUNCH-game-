@@ -25,7 +25,13 @@ advanceDay=function(...args){
   // Race-day games are resolved at close, not as soon as day 10/24 arrives.
   let outcome={applied:false,held:0,cancelled:0};
   try{outcome=N.closeDay(state,leaving,params);}catch(err){console.error('HORSE RANCH 20.12 NPC racing:',err);}
-  if(outcome.applied){log(`NPC 자동 경주 · ${outcome.held}경기 완료${outcome.cancelled?' · 출전마 부족 '+outcome.cancelled+'경기':''}`);save();}
+  if(outcome.applied){
+    // A race is playable until its date closes. Afterwards its registration
+    // must not permanently block the horse from sales, schooling or new races.
+    const closed=new Set((state.races||[]).filter(r=>N.dayOf(r)===leaving&&r.state==='finished').map(r=>String(r.id)));
+    state.registrations=(state.registrations||[]).filter(reg=>!closed.has(String(reg.raceId)));
+    log(`NPC 자동 경주 · ${outcome.held}경기 완료${outcome.cancelled?' · 출전마 부족 '+outcome.cancelled+'경기':''}`);save();
+  }
   const output=beforeAdvance.apply(this,args);
   // NPC horses previously did not recover from their fatigue and hoof wear.
   N.restoreNpcDaily(state);
