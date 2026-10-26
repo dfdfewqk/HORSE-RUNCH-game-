@@ -49,13 +49,14 @@ function launch(initial={},seed=42){
     snapshot:()=>vm.runInContext('JSON.stringify(state)',context)};
 }
 function openGame(game){
+  const previousAlerts=game.alerts.length;
   game.exec("setRanchName();goOpeningRace();hr2026SetRace('opening-1600');hr2026SetJockey('j1');registerOpeningRace();runOpeningRace();continueAfterOpeningRace();");
   assert.equal(game.exec("state.openingStage"),'mares');
   game.exec("state.openingMareChoices=hr2026AvailableMares().slice(0,2).map(h=>h.id);hr2026FinishMareChoice()");
   assert.equal(game.exec("state.startDone"),true);
   assert.equal(game.exec("state.horses.length"),3);
   assert.equal(game.exec("state.results.length"),1);
-  assert.equal(game.alerts.length,0,'opening should not show blocking alerts');
+  assert.equal(game.alerts.length,previousAlerts,'opening should not show new blocking alerts');
 }
 const invalid='{broken save data';
 {
