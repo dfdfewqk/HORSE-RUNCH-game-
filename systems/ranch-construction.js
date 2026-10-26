@@ -6,8 +6,7 @@
 'use strict';
 const PLANS=Object.freeze({
  stable:Object.freeze({label:'마방 4칸 증축',cost:12000000,days:30,upkeep:75000,plots:1,stalls:4}),
- pasture:Object.freeze({label:'방목장 추가',cost:6000000,days:21,upkeep:40000,plots:2}),
- care:Object.freeze({label:'관리시설 개선',cost:5000000,days:30,upkeep:30000,plots:0}),
+ // Pasture/health mechanics belong to the separate horse-rearing system.
  land:Object.freeze({label:'목장 부지 확장',cost:10000000,days:60,upkeep:20000,plots:0,capacity:6})
 });
 const INITIAL_PLOTS=12,USED_INITIAL_PLOTS=6,INITIAL_MONTHLY_UPKEEP=200000;
