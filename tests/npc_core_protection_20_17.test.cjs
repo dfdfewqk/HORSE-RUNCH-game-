@@ -95,6 +95,17 @@ assert.ok(E.ensure(noNameWorld).ranches['Ordinary-small'].totalSafetySupport>0);
 assert.equal(E.ensure(noNameWorld).ranches['Ordinary-small'].crisisMonths,0);
 assert.equal(E.coreHorseIds(noNameWorld,noNames).racer!=null,true);
 
+const emptyStable=ranch('Empty-but-active',[],0,false);
+const emptyWorld={year:1,month:1,day:30,money:0,horses:[],npcs:[emptyStable]};
+for(let month=1;month<=3;month++){
+ const report=E.closeMonth(emptyWorld,'1-'+month,0,{'Empty-but-active':0},()=>1000000);
+ assert.equal(report.applied,true);
+ assert.equal(emptyStable.horses.length,0,'no imaginary replacement horses');
+}
+assert.ok(emptyStable.funds>=E.recruitmentCost({experienced:true}),'empty ranch can afford experienced replacement after safety rescue');
+assert.ok(E.canRecruit(emptyStable,E.recruitmentCost({experienced:true})),'existing NPC recruitment becomes feasible');
+assert.ok(E.ensure(emptyWorld).ranches['Empty-but-active'].totalSafetySupport>0);
+
 const closeRaceWorld={year:1,month:1,day:1,npcs:[ranch('Role-test',[
  horse(501,'수',81),horse(502,'수',86)
 ])]};
