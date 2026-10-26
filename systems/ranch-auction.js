@@ -89,14 +89,14 @@ function closeAuction(world,day,opts={}){
   if(!h){results.push({horseId:lot.horseId,status:'missing',seller:lot.seller});continue;}
   const npcs=(world.npcs||[]).filter(n=>n.name!==lot.seller&&(n.horses||[]).length<Math.min(100,num(n.stalls)||100));
   const offers=npcs.map(n=>{const max=roundPrice(lot.reserve*(.86+(hash(`${a.week}|${lot.horseId}|${n.name}`)%50)/100));return{n,price:max};})
-   .filter(o=>num(o.n.funds||70000000)>=o.price).sort((x,y)=>y.price-x.price||x.n.name.localeCompare(y.n.name));
+   .filter(o=>num(o.n.funds)>=o.price).sort((x,y)=>y.price-x.price||x.n.name.localeCompare(y.n.name));
   const rival=offers[0];const playerBid=mine?0:num(lot.playerBid);
   let buyer=null,price=0;
   if(!mine&&playerBid>=lot.reserve&&playerBid>=num(rival?.price)&&world.horses.length<num(world.stalls)&&num(world.money)>=playerBid){buyer='player';price=playerBid;}
   else if(rival&&rival.price>=lot.reserve){buyer=rival.n;price=rival.price;}
   if(!buyer){results.push({horseId:h.id,horseName:h.name,seller:lot.seller,status:'unsold'});continue;}
   if(buyer==='player'){world.money-=price;spent+=price;world.horses.push(h);won++;}
-  else {buyer.horses.push(h);buyer.funds=num(buyer.funds||70000000)-price;}
+  else {buyer.horses.push(h);buyer.funds=num(buyer.funds)-price;}
   const at=horses.findIndex(x=>String(x.id)===String(h.id));if(at>=0)horses.splice(at,1);
   if(mine){world.money+=price;earned+=price;if(opts.archive)opts.archive(h,world.year);}else if(seller)seller.funds=num(seller.funds)+price;
   sold++;results.push({horseId:h.id,horseName:h.name,seller:lot.seller,status:'sold',buyer:buyer==='player'?'player':buyer.name,price});
