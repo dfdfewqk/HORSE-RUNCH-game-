@@ -158,8 +158,10 @@ function racePermission(c,r){
 }
 function withHorse(c,fn){
   if(!c||state.horses.some(h=>String(h.id)===String(c.horse.id)))return fn();
+  const previousHorse=state.selectedHorse,previousJockey=state.selectedJockey;
   state.horses.push(c.horse);
   try{return fn();}finally{
+    state.selectedHorse=previousHorse;state.selectedJockey=previousJockey;
     state.horses=state.horses.filter(h=>h!==c.horse);
     save();render();
   }
@@ -221,7 +223,7 @@ function action(fn){const r=fn();if(!r?.ok)alert(r?.reason||'처리하지 못했
 window.hrConsignmentAccept=(n,id,type)=>action(()=>accept(n,id,type));
 window.hrConsignmentSchool=(id,kind,days)=>action(()=>school(active().find(c=>c.id===id),kind,days));
 window.hrConsignmentRider=(id,jid,days)=>action(()=>rider(active().find(c=>c.id===id),jid,days));
-window.hrConsignmentRegister=(id,rid)=>action(()=>register(active().find(c=>c.id===id),rid,JOCKEYS[0]?.id));
+window.hrConsignmentRegister=(id,rid,jid)=>action(()=>register(active().find(c=>c.id===id),rid,jid||JOCKEYS[0]?.id));
 window.hrConsignmentRace=(id,rid,jid)=>action(()=>race(active().find(c=>c.id===id),rid,jid));
 save();render();
 })();
