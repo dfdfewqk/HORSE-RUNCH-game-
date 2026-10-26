@@ -71,7 +71,8 @@ advanceDay=function(...args){
  if(lastDay&&E.monthKey(state)!==departingMonth){
   const report=E.closeMonth(state,departingMonth,playerCount,npcCounts,marketPrice);
   if(report.applied){
-   log(`${departingMonth} 월말 사육비 ${money(report.playerPaid)}${report.playerUnpaid?' · 미납 '+money(report.playerUnpaid):''} · NPC 매각 ${report.npcSales.length}건`);
+   const support=report.npcSummary.reduce((sum,r)=>sum+r.safetySupport,0);
+   log(`${departingMonth} 월말 사육비 ${money(report.playerPaid)}${report.playerUnpaid?' · 미납 '+money(report.playerUnpaid):''} · NPC 매각 ${report.npcSales.length}건${support?' · NPC 회생 지원 '+money(support):''}`);
   }
  }
  if(income.events||lastDay){save();if(!args[0]&&!HR_BATCH_DAY)render();}
@@ -81,13 +82,13 @@ const oldDashboard=dashboard;
 dashboard=function(){
  const x=E.ensure(state),summary=x.recent.slice(-1)[0];
  const named=(state.npcs||[]).filter(r=>r.named);
- const rows=named.map(r=>{const s=E.status(r.funds,r.horses?.length);return `<tr><td>${escapeHtml(r.name)}</td><td>${money(r.funds)}</td><td>${s.runway.toFixed(1)}개월</td><td>${escapeHtml(s.status)}</td></tr>`;}).join('');
+ const rows=named.map(r=>{const s=E.status(r.funds,r.horses?.length);return `<tr><td>${escapeHtml(r.name)}</td><td>${money(r.funds)}</td><td>${s.runway.toFixed(1)}개월</td><td>${escapeHtml(s.status)}</td><td>${money(x.ranches[r.name]?.totalSafetySupport||0)}</td></tr>`;}).join('');
  return oldDashboard()+`<div class="panel"><div class="panelTitle"><h2>목장 경제 · 20.13</h2><span class="badge">기본 사육비 월 ${money(E.CONFIG.monthlyUpkeep)} / 마리</span></div>
  <div class="stat"><span>내 말 ${state.horses.length}마리 · 다음 월 사육비(예상)</span><b>${money(state.horses.length*E.CONFIG.monthlyUpkeep)}</b></div>
  <div class="stat"><span>기본 사육비 미납</span><b>${money(x.player.unpaid)}</b></div>
  <div class="small">기존 교육·조교비는 기존 월말 장부에서만 정산합니다. 교배 예약료도 기존 방식대로 한 번만 납부합니다. 치료 기능이 없으므로 치료비는 아직 청구하지 않습니다.</div>
- ${summary?`<div class="small">지난 월말: ${escapeHtml(summary.month)} · 회생·위기 목장 ${summary.crisis}곳 · 실제 NPC 매각 ${summary.npcSales}건</div>`:''}
- <table class="table" style="margin-top:10px"><tr><th>네임드 목장</th><th>보유 자금</th><th>사육비 기준 운영 가능</th><th>상태</th></tr>${rows}</table></div>`;
+ ${summary?`<div class="small">지난 월말: ${escapeHtml(summary.month)} · 회생·위기 목장 ${summary.crisis}곳 · 실제 NPC 매각 ${summary.npcSales}건 · 최소 회생 지원 ${money(summary.safetySupport||0)}</div>`:''}
+ <table class="table" style="margin-top:10px"><tr><th>네임드 목장</th><th>보유 자금</th><th>사육비 기준 운영 가능</th><th>상태</th><th>회생 지원 누계</th></tr>${rows}</table></div>`;
 };
 save();render();
 })();
