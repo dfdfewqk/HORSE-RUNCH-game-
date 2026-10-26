@@ -28,6 +28,21 @@ advanceDay=function(...args){
   }
   return result;
 };
+// A sale removes the horse from the active roster. Keep the true parents and
+// observed temperament in the existing pedigree archive, without treating a
+// sold horse as dead. Pending foals also require both parents until birth.
+const beforeSell=sellHorse;
+sellHorse=function(id){
+  const h=(state.horses||[]).find(x=>String(x.id)===String(id));
+  if(h&&L.hasPendingBreeding(state,h))
+    return alert('출산 예약의 부모 말은 출산이 끝날 때까지 판매할 수 없습니다.');
+  const result=beforeSell.apply(this,arguments);
+  if(h&&!(state.horses||[]).some(x=>String(x.id)===String(h.id))){
+    L.archivePedigree(state,h,'판매',state.year,state.ranchName||'플레이어 목장');
+    save();if(!HR_BATCH_DAY)render();
+  }
+  return result;
+};
 const beforeHistory=history;
 history=function(){
   const recent=(state.horseLifeEvents||[]).slice(-12).reverse();
