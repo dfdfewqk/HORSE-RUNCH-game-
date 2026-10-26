@@ -68,7 +68,7 @@
         finishing:jockeyFinish,
         variation:(random()-.5)*.24,
         stridePhase:random()*Math.PI*2,
-        lane:i%4,laneChanges:0,blockedSteps:0
+        lane:i%10,laneChanges:0,lastLaneChangeAt:-100,blockedSteps:0
       };
     });
     const interval=.5;
@@ -97,13 +97,13 @@
         let trafficPenalty=0;
         if(time>3&&x.pos<distance-15){
           const ahead=pack.filter(y=>y.id!==x.id&&y.lane===x.lane&&
-            y.pos>=x.pos&&y.pos-x.pos<9&&y.velocity<x.velocity+.35)
+            y.pos>x.pos+.05&&y.pos-x.pos<8&&y.velocity<x.velocity+.25)
             .sort((a,b)=>a.pos-b.pos)[0];
           if(ahead){
-            const choices=[x.lane-1,x.lane+1].filter(l=>l>=0&&l<=3);
-            const free=choices.find(l=>pack.every(y=>y.id===x.id||y.lane!==l||Math.abs(y.pos-x.pos)>=8));
-            if(free!==undefined){x.lane=free;x.laneChanges++;}
-            else {trafficPenalty=clamp(.10+Math.max(0,x.velocity-ahead.velocity)*.16,.10,.38);x.blockedSteps++;}
+            const choices=[x.lane-1,x.lane+1].filter(l=>l>=0&&l<=9);
+            const free=choices.find(l=>pack.every(y=>y.id===x.id||y.lane!==l||Math.abs(y.pos-x.pos)>=5));
+            if(free!==undefined&&time-x.lastLaneChangeAt>=8){x.lane=free;x.lastLaneChangeAt=time;x.laneChanges++;}
+            else {trafficPenalty=clamp(.06+Math.max(0,x.velocity-ahead.velocity)*.13,.06,.26);x.blockedSteps++;}
           }
         }
         const goal=clamp(x.base+tactic+x.variation+noise-cornerPenalty-energyPenalty+finishAbility-trafficPenalty,11.5,19.8);
