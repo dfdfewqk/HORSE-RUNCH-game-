@@ -69,7 +69,10 @@ detailBody=function(h,tab,recent){
 const beforeDay=advanceDay;
 advanceDay=function(...args){
  // Legacy injury durations may be supplied by saved games or other modules.
- for(const h of owned())if(Number(h.injury)>0&&!h.hrHealth?.active)H.importLegacy(h,getDay());
+ for(const h of owned()){
+  if(h.hrHealth?.active)h.injury=2;
+  else if(Number(h.injury)>0)H.importLegacy(h,getDay());
+ }
  const prior=getDay(),out=beforeDay.apply(this,args);
  if(!state.startDone||getDay()===prior)return out;
  let changed=false,completed=0,forcedRetire=0;
