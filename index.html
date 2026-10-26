@@ -165,7 +165,7 @@ function quickRace(id){const next=state.races.filter(r=>dateIndex(r.year,r.month
 function nav(){const main=[['dashboard','홈'],['stable','마방'],['training','말 교육'],['races','경주'],['breeding','번식']];const more=[['market','시장'],['jockey','기수'],['history','기록실']];return `<div class="nav">${main.map(([k,l])=>`<button class="${state.tab===k?'active':''}" onclick="state.tab='${k}';render()">${l}</button>`).join('')}<button class="${state.menu?'active':''}" onclick="state.menu=!state.menu;render()">${state.menu?'관리 닫기':'관리 메뉴'}</button></div>${state.menu?`<div class="subnav">${more.map(([k,l])=>`<button class="${state.tab===k?'active':''}" onclick="state.tab='${k}';state.menu=false;render()">${l}</button>`).join('')}</div>`:''}`}
 function header(){return `<div class="top"><div class="brand"><div class="brandMark">♞</div><div><h1>${escapeHtml(state.ranchName||'HORSE RANCH')}</h1><div class="sub">경주마 육성 · 혈통 · 번식</div></div></div><div class="hud"><b>${money(state.money)}</b> · 명성 ${state.reputation}<br><span class="small">${state.year}년 ${state.month}월 ${state.day}일 · ${state.horses.length}/${state.stalls}마</span></div></div>`}
 function footer(){return `<div class="panel"><div class="panelTitle"><h3>최근 기록</h3><div class="row"><button class="action gray" onclick="save()">저장</button><button class="action red" onclick="resetGame()">새 게임</button></div></div><div style="max-height:160px;overflow:auto;background:#0e1115;border:1px solid #343943;border-radius:6px;padding:8px;font-size:12px">${state.log.map(x=>`<div style="padding:3px 0;border-bottom:1px dashed #2c3138">${escapeHtml(x)}</div>`).join('')}</div></div>`}
-function render(){let content;if(!state.startDone){content=intro()}else{const map={dashboard,stable,training,races:raceList,breeding,market,jockey:jockeyView,history};content=map[state.tab]?.()||dashboard()}$('root').innerHTML=header()+nav()+content+footer()}
+function render(){let content;if(!state.startDone){content=intro()}else{const map={dashboard,stable,training,races:raceList,breeding,market,jockey:jockeyView,history};content=state.tab==='training'&&!window.HorseRanchLifeCycle?'<div class="panel">교육 시스템을 준비하고 있습니다.</div>':map[state.tab]?.()||dashboard()}$('root').innerHTML=header()+nav()+content+footer()}
 function resetGame(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload()}
 
 
@@ -582,7 +582,7 @@ advanceDay=function(silent=false){
     const F=HorseRanchFoalEducation,month=monthKey();
     state.horses.filter(h=>age(h)<2).forEach(h=>{
       const e=F.ensure(h);
-      if(!e||e.mode!=='auto')return;
+      if(!e||e.mode!=='auto'||h.hrSchooling)return; // 20.15 newborns use facility education only
       const remain=F.POINTS_PER_MONTH-(e.monthKey===month?e.used:0);
       const estimated=Math.max(0,remain)*F.EDUCATION_FEE;
       if(estimated&&!F.canAfford(state,estimated))return;
@@ -634,5 +634,7 @@ if(!load())seed();else normalize();render();
 <script src="systems/npc-auto-racing-integration.js"></script>
 <script src="systems/ranch-economy.js"></script>
 <script src="systems/ranch-economy-integration.js"></script>
+<script src="systems/horse-interaction.js"></script>
+<script src="systems/horse-interaction-integration.js"></script>
 </body>
 </html>

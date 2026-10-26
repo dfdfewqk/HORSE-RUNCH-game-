@@ -22,7 +22,10 @@
         const j=own?getJockey(jid):null;
         const relation=own && j && typeof horseJockeyRelation==='function'
           ?horseJockeyRelation(h.id,j.id,false):null;
-        return {horse:h,jockey:j,friendship:relation?.friendship??null};
+        const I=window.HorseRanchInteraction;
+        const response=own&&j&&I&&h.hrTemperament
+          ?I.raceReaction(h,j,horseJockeyRelation(h.id,j.id,true),`${r.id}|${h.id}|${j.id}`):null;
+        return {horse:h,jockey:j,response};
       });
       const sim=engine.simulate({race:r,entrants});
       r.simulation=sim;

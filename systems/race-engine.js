@@ -44,27 +44,25 @@
       const h=entry.horse, j=entry.jockey||null;
       const speed=numeric(h.speed,70), stamina=numeric(h.stamina,70), power=numeric(h.power,70);
       const cond=numeric(h.condition,82), fatigue=numeric(h.fatigue,0), hoof=numeric(h.hoof,100);
-      // Schooling is a modest *reliability* benefit, only after the adult personality locks.
-      // Unschoolled legacy horses retain precisely their previous race calculation.
-      const school=h.foalEducation?.locked?h.foalEducation.skills:null;
-      const schoolBonus=school?clamp((numeric(school.calm,0)+numeric(school.gate,0))*.00055,0,.077):0;
+      // Education and rider affinity affect behavior/response events, never
+      // base speed, stamina, power or direct acceleration bonuses.
+      const response=entry.response||{type:'none',delay:0,paceWaste:0};
       const preferredBand=BANDS.indexOf(h.distanceBand);
       const gap=preferredBand===-1?0:Math.abs(preferredBand-raceBand);
       const mismatchedSurface=!!(h.surface && race.surface && h.surface!==race.surface);
       const goodStyle=!!(j && Array.isArray(j.style) && j.style.includes(h.style));
       const goodBand=!!(j && Array.isArray(j.bands) && j.bands.includes(BANDS[raceBand]));
       const jockeyPace=numeric(j?.pace,77), jockeyCorner=numeric(j?.corner,77), jockeyFinish=numeric(j?.finish,77);
-      // A null/unknown friendship never silently becomes a numerical bonus.
-      const friendship=entry.friendship == null ? null : clamp(numeric(entry.friendship,0),0,100);
-      const base=16.2+schoolBonus+(speed-70)*.042+(stamina-70)*.008+(cond-80)*.008-
+      const base=16.2+(speed-70)*.042+(stamina-70)*.008+(cond-80)*.008-
         fatigue*.011-(100-hoof)*.005-gap*.29-(mismatchedSurface?.24:0)+
         (goodStyle?.075:0)+(goodBand?.04:0)+(j?(jockeyPace-77)*.0025:0);
       return {
         id:String(h.id),name:String(h.name||`출전마 ${i+1}`),horse:h,index:i,
         speedStat:speed, stamina, power,tactic:h.style,
         pos:0,velocity:0,energy:1,finish:null,base,
-        acceleration:1.05+(power-70)*.012+(j?(numeric(j.skill,77)-77)*.003:0)+
-          (friendship==null?0:(friendship-50)*.002),
+        acceleration:1.05+(power-70)*.012+(j?(numeric(j.skill,77)-77)*.003:0),
+        responseType:response.type||'none',startDelay:clamp(numeric(response.delay,0),0,3),
+        responseWaste:clamp(numeric(response.paceWaste,0),0,.15),
         energyUsage:clamp(.76+(70-stamina)*.012,.50,1.15),
         cornerHandling:jockeyCorner,
         finishing:jockeyFinish,
@@ -84,6 +82,7 @@
       const prior=alive.map(x=>x.pos);
       // Each horse's current physical position determines its current race phase.
       alive.forEach((x,index)=>{
+        if(time<x.startDelay){x.velocity=0;return;}
         const fraction=clamp(x.pos/distance,0,1);
         const tactic=tacticalOffset(x.tactic,fraction);
         const corner=fraction>=.20&&fraction<=.27 || fraction>=.62&&fraction<=.73;
@@ -97,7 +96,8 @@
         x.pos=Math.min(distance,x.pos+x.velocity*interval);
         const pressure=1+Math.max(0,tactic)*.13;
         const totalExpectedTime=distance/16.2;
-        x.energy=clamp(x.energy - interval/totalExpectedTime*x.energyUsage*pressure,0,1);
+        x.energy=clamp(x.energy - interval/totalExpectedTime*x.energyUsage*pressure -
+          (x.responseWaste&&time<Math.max(3,x.startDelay+3)?x.responseWaste*interval/3:0),0,1);
         if(x.pos>=distance) {
           const travelled=distance-prior[index];
           x.finish=round(time+interval*(travelled/Math.max(x.velocity*interval,.00001)),4);
@@ -115,6 +115,7 @@
       stepSeconds:interval,frameSeconds:interval*sampleEvery,
       ids:runners.map(x=>x.id),names:runners.map(x=>x.name),
       frames,results,finishSeconds:round(Math.max(...runners.map(x=>x.finish)),2),
+      behaviorEvents:runners.filter(x=>x.responseType!=='none').map(x=>({horseId:x.id,type:x.responseType,startDelay:x.startDelay,paceWaste:x.responseWaste})),
       explanation:'시간 단계별 위치·속도·지구력 기반 계산. 경기 그래픽/물리 인증과는 별도.'
     };
   }
