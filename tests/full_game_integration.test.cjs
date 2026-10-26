@@ -35,7 +35,7 @@ function boot(initial=null,seed=2786){
     },
     alert:x=>notices.push(String(x)),confirm:()=>false,
     console:{log:()=>{},warn:()=>{},error:(...parts)=>errors.push(parts.join(' '))},
-    location:{reload(){}},setTimeout:()=>0,clearTimeout:()=>{}
+    location:{reload(){}},setTimeout:()=>0,clearTimeout:()=>{},setInterval:()=>0,clearInterval:()=>{}
   };
   world.window=world;
   const ctx=vm.createContext(world);
