@@ -41,4 +41,14 @@ function world(){return{year:1,month:1,day:1,stalls:2,horses:[
  assert.equal(C.decide(w,1,'keep').ok,true);
  assert.equal(C.siteCount(w),2);
 }
+{
+ const w=world();w.registrations=[{raceId:'R1',horseId:1}];
+ C.queue(w,1);
+ assert.equal(w.registrations.length,0,'retirement clears prior race booking');
+ assert.equal(C.decide(w,1,'board').ok,true);
+ C.queue(w,1);
+ assert.equal(C.siteCount(w),1,'redecision keeps external horse offsite');
+ assert.equal(C.decide(w,1,'keep').ok,false,'cannot exceed stable capacity');
+ assert.equal(C.decide(w,1,'board').ok,true);
+}
 console.log('horse life decisions: OK');
