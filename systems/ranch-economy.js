@@ -76,6 +76,74 @@ function creditFinishedRaces(world){
  }
  return {paid,events};
 }
+
+/* Ranch identity: protect one racing flagship and up to one sire and dam.
+ * Persist role IDs in the existing economy ledger. Re-select only if the
+ * incumbent becomes ineligible or a challenger clearly outperforms it.
+ * Breeding is owned by the lifecycle/education systems; no NPC mating here.
+ */
+const coreKey=h=>String(h?.id);
+const coreDay=w=>(n(w.year)-1)*360+(n(w.month)-1)*30+n(w.day);
+function racingValue(h,w){
+ const rating=Number.isFinite(Number(h.rating))&&h.rating!=null?n(h.rating):
+  (n(h.speed)*.45+n(h.stamina)*.30+n(h.power)*.25);
+ const today=coreDay(w);
+ let important=0;
+ for(const rec of h.history||[]){
+  if(n(rec.place)!==1)continue;
+  const weight=rec.grade==='G1'?14:rec.grade==='G2'?9:rec.grade==='G3'?5:2;
+  const day=(n(rec.year)-1)*360+(n(rec.month)-1)*30+n(rec.day);
+  important+=day>0&&today-day>=0&&today-day<360?weight:weight*.20;
+ }
+ return rating+Math.min(25,important)+Math.min(6,n(h.wins)*.5);
+}
+function breedingValue(h,world){
+ const genes=['speed','stamina','power'].map(k=>{
+  const value=h.genetic?.[k]??h.caps?.[k]??h[k];
+  return Number.isFinite(Number(value))?n(value):0;
+ });
+ const potential=genes.reduce((a,b)=>a+b,0)/3;
+ const pedigree=Number.isFinite(Number(h.pedigree))?n(h.pedigree):potential;
+ // Count only recorded descendants, never invent successful progeny.
+ let bestChild=0;
+ const children=[...(world.horses||[]),...(world.pool||[]),
+  ...(world.npcs||[]).flatMap(r=>r.horses||[])];
+ for(const child of children){
+  if(coreKey(child.fatherId)!==coreKey(h.id)&&coreKey(child.motherId)!==coreKey(h.id))continue;
+  const rating=n(child.rating)||((n(child.speed)+n(child.stamina)+n(child.power))/3);
+  const g1=(child.history||[]).filter(x=>x.grade==='G1'&&n(x.place)===1).length;
+  bestChild=Math.max(bestChild,Math.min(8,Math.max(0,rating-70)*.15+n(child.wins)*.5+g1*2));
+ }
+ return potential*.75+pedigree*.25+bestChild;
+}
+function keepCore(horses,oldId,eligible,score,margin){
+ const candidates=horses.filter(eligible);
+ if(!candidates.length)return null;
+ const ranked=candidates.map(h=>({h,score:score(h)}))
+  .sort((a,b)=>b.score-a.score||coreKey(a.h).localeCompare(coreKey(b.h)));
+ const best=ranked[0],incumbent=ranked.find(x=>oldId!=null&&coreKey(x.h)===String(oldId));
+ return coreKey(incumbent&&best.score<incumbent.score+margin?incumbent.h:best.h);
+}
+function coreHorseIds(world,ranch){
+ if(!ranch)return{racer:null,sire:null,dam:null};
+ const e=ensure(world),ledger=e.ranches[ranch.name],prev=ledger.coreIds||{};
+ const horses=ranch.horses||[];
+ const racer=keepCore(horses,prev.racer,h=>h&&!h.retired&&n(h.age)>=2,
+  h=>racingValue(h,world),7);
+ const sire=keepCore(horses,prev.sire,h=>h&&!h.retired&&n(h.age)>=3&&h.gender==='수',
+  h=>breedingValue(h,world),5);
+ const dam=keepCore(horses,prev.dam,h=>h&&!h.retired&&n(h.age)>=3&&h.gender==='암',
+  h=>breedingValue(h,world),5);
+ ledger.coreIds={racer,sire,dam};
+ return ledger.coreIds;
+}
+function protectedIds(world,ranch){
+ return new Set(Object.values(coreHorseIds(world,ranch)).filter(x=>x!=null).map(String));
+}
+function isProtected(world,ranch,horse){
+ return !!horse&&protectedIds(world,ranch).has(coreKey(horse));
+}
+
 function isSaleCandidate(h,world){
  if(!h||h.retired||h.pregnantUntil||Number(h.age)<2)return false;
  const auction=world.ranchAuction?.current;
@@ -85,7 +153,8 @@ function isSaleCandidate(h,world){
 function tryRealSale(world,seller,priceFn,soldIdSet){
  const horses=seller.horses||[];
  if(horses.length<=CONFIG.minRanchHorses)return null;
- const candidates=horses.filter(h=>isSaleCandidate(h,world)&&!soldIdSet.has(String(h.id)))
+ const protectedHorseIds=protectedIds(world,seller);
+ const candidates=horses.filter(h=>!protectedHorseIds.has(String(h.id))&&isSaleCandidate(h,world)&&!soldIdSet.has(String(h.id)))
  .sort((a,b)=>n(a.rating)-n(b.rating)||n(a.id)-n(b.id));
  for(const h of candidates){
   const price=priceValue(priceFn(h)*CONFIG.transferDiscount);
@@ -131,7 +200,8 @@ function closeMonth(world,month,prevPlayerCount,npcCounts,priceFn){
   const stillInCrisis=['위기','회생'].includes(status(ranch.funds,ranch.horses.length).status);
   meta.crisisMonths=stillInCrisis?meta.crisisMonths+1:0;
   let safetySupport=0;
-  if(ranch.named&&meta.crisisMonths>=3&&count>0){
+  // Every NPC ranch survives downturns; reserve is explicit in the ledger.
+  if(meta.crisisMonths>=3&&count>0){
    const minimum=4*count*CONFIG.monthlyUpkeep;
    safetySupport=Math.max(0,minimum-n(ranch.funds));
    ranch.funds+=safetySupport;
@@ -167,7 +237,7 @@ function canRecruit(ranch,fee){
  return (status(balance,ranch.horses?.length).status==='정상'||rebuild)&&balance>=n(fee)+upcomingUpkeep(ranch)*months;
 }
 function chargeRecruit(world,ranch,cost){const e=ensure(world);const fee=n(cost);if(!canRecruit(ranch,fee))return false;ranch.funds-=fee;e.ranches[ranch.name].totalRecruitment+=fee;return true;}
-const api=Object.freeze({CONFIG,RESERVE_MONTHS,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,buyerForPlayerSale,recruitmentCost,canRecruit,chargeRecruit});
+const api=Object.freeze({CONFIG,RESERVE_MONTHS,monthKey,status,ensure,trainingBudget,settleNpcTraining,pricePool,creditFinishedRaces,closeMonth,buyerForPlayerSale,recruitmentCost,canRecruit,chargeRecruit,racingValue,breedingValue,coreHorseIds,protectedIds,isProtected});
 root.HorseRanchEconomy=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
