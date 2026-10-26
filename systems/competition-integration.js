@@ -45,7 +45,20 @@
    }
  }
  const originalGenerate=generateRaces;
- generateRaces=function(){const out=originalGenerate();R.g2Schedule(state.races);return out;};
+ generateRaces=function(){
+   const league=window.HorseRanchLeagueSchedule;
+   if(!league){const out=originalGenerate();R.g2Schedule(state.races);return out;}
+   state.races=league.generate(state.year);
+   state.leagueScheduleVersion=league.VERSION;
+   return state.races;
+ };
+ // On a fresh setup, the original seed ran before the external league script loaded.
+ // Rebuild only unstarted calendars; keep every tutorial opening race and its result.
+ if(!state.startDone&&Number(state.year)===1&&Number(state.month)===1&&Number(state.day)===1&&!state.leagueScheduleVersion){
+   const opening=(state.races||[]).filter(r=>r.opening);
+   generateRaces();
+   state.races=[...opening,...state.races];
+ }
  const originalEligible=eligible;
  eligible=function(h,r){return originalEligible(h,r)&&R.entryCheck(h,r).ok;};
  deterministicField=function(r){
@@ -99,7 +112,7 @@
  setAllRatings();
  if(!state.worldCompetitionVersion){
    // Do not retroactively change a veteran save's planned races.
-   if(!state.startDone&&Number(state.year)===1)R.g2Schedule(state.races);
+   if(!state.leagueScheduleVersion&&!state.startDone&&Number(state.year)===1)R.g2Schedule(state.races);
    state.worldCompetitionVersion=1;
  }
  save();render();

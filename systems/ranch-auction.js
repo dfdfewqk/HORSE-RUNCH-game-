@@ -32,10 +32,16 @@ function ensure(world){
  const v=world.ranchAuction;if(!Array.isArray(v.history))v.history=[];
  return v;
 }
+// All NPC sales share the core-horse and minimum-roster safeguards.
+function npcCanSell(world,ranch,h){
+ const E=root.HorseRanchEconomy,minimum=E?.CONFIG.minRanchHorses??3;
+ return !!ranch&&!!h&&(ranch.horses||[]).length>minimum&&
+  !(E&&E.isProtected(world,ranch,h));
+}
 function daily(world,day=dayOf(world)){
  const locked=new Set((ensure(world).current?.status==='open'?ensure(world).current.lots:[]).map(l=>String(l.horseId)));
  const pool=[];
- for(const ranch of world.npcs||[])for(const h of ranch.horses||[]){if(h.retired||num(h.age)<2||h.pregnantUntil||locked.has(String(h.id)))continue;pool.push({horseId:h.id,owner:ranch.name});}
+ for(const ranch of world.npcs||[])for(const h of ranch.horses||[]){if(h.retired||num(h.age)<2||h.pregnantUntil||locked.has(String(h.id))||!npcCanSell(world,ranch,h))continue;pool.push({horseId:h.id,owner:ranch.name});}
  pool.sort((a,b)=>hash(`${day}|daily|${a.horseId}`)-hash(`${day}|daily|${b.horseId}`)||num(a.horseId)-num(b.horseId));
  return pool.slice(0,DAILY_COUNT);
 }
@@ -47,7 +53,7 @@ function openAuction(world,day,priceFn){
  const eligiblePlayer=top.some(r=>r.player);
  const pool=[];
  for(const n of world.npcs||[]){if(!eligible.includes(n.name))continue;
-  for(const h of n.horses||[]){if(h.retired||num(h.age)<2||h.pregnantUntil)continue;pool.push({horseId:h.id,seller:n.name,sellerKind:'npc'});}
+  for(const h of n.horses||[]){if(h.retired||num(h.age)<2||h.pregnantUntil||!npcCanSell(world,n,h))continue;pool.push({horseId:h.id,seller:n.name,sellerKind:'npc'});}
  }
  pool.sort((a,b)=>hash(`${day}|special|${a.horseId}`)-hash(`${day}|special|${b.horseId}`)||num(a.horseId)-num(b.horseId));
  const chosen=[],usage=new Map();for(const entry of pool){if(chosen.length>=SPECIAL_COUNT)break;if(num(usage.get(entry.seller))>=2)continue;chosen.push(entry);usage.set(entry.seller,num(usage.get(entry.seller))+1);}
@@ -59,6 +65,8 @@ function openAuction(world,day,priceFn){
 function placeBid(world,id,priceFn){
  const a=ensure(world).current;if(!a||a.status!=='open'||!isFriday(dayOf(world))||a.day!==dayOf(world))return {ok:false,reason:'금요일 경매가 진행 중이 아닙니다.'};
  const lot=a.lots.find(x=>String(x.horseId)===String(id));if(!lot||lot.seller===world.ranchName)return{ok:false,reason:'입찰 대상이 아닙니다.'};
+ const seller=(world.npcs||[]).find(n=>n.name===lot.seller),h=seller?.horses?.find(h=>String(h.id)===String(id));
+ if(!npcCanSell(world,seller,h))return{ok:false,reason:'목장이 보호 중이거나 판매할 수 없는 경주마입니다.'};
  const min=lot.playerBid>0?lot.playerBid+BID_STEP:lot.reserve;
  const committed=a.lots.reduce((sum,x)=>sum+(x===lot?0:num(x.playerBid)),0);
  if(num(world.money)-committed<min)return{ok:false,reason:'동시 입찰에 필요한 자금이 부족합니다.'};
@@ -87,16 +95,18 @@ function closeAuction(world,day,opts={}){
   const horses=mine?world.horses:seller?.horses;
   const h=horses?.find(h=>String(h.id)===String(lot.horseId));
   if(!h){results.push({horseId:lot.horseId,status:'missing',seller:lot.seller});continue;}
+  // Check again at settlement: a previously listed horse may become core stock.
+  if(!mine&&!npcCanSell(world,seller,h)){results.push({horseId:h.id,horseName:h.name,seller:lot.seller,status:'retained'});continue;}
   const npcs=(world.npcs||[]).filter(n=>n.name!==lot.seller&&(n.horses||[]).length<Math.min(100,num(n.stalls)||100));
   const offers=npcs.map(n=>{const max=roundPrice(lot.reserve*(.86+(hash(`${a.week}|${lot.horseId}|${n.name}`)%50)/100));return{n,price:max};})
-   .filter(o=>num(o.n.funds||70000000)>=o.price).sort((x,y)=>y.price-x.price||x.n.name.localeCompare(y.n.name));
+   .filter(o=>num(o.n.funds)>=o.price).sort((x,y)=>y.price-x.price||x.n.name.localeCompare(y.n.name));
   const rival=offers[0];const playerBid=mine?0:num(lot.playerBid);
   let buyer=null,price=0;
   if(!mine&&playerBid>=lot.reserve&&playerBid>=num(rival?.price)&&world.horses.length<num(world.stalls)&&num(world.money)>=playerBid){buyer='player';price=playerBid;}
   else if(rival&&rival.price>=lot.reserve){buyer=rival.n;price=rival.price;}
   if(!buyer){results.push({horseId:h.id,horseName:h.name,seller:lot.seller,status:'unsold'});continue;}
   if(buyer==='player'){world.money-=price;spent+=price;world.horses.push(h);won++;}
-  else {buyer.horses.push(h);buyer.funds=num(buyer.funds||70000000)-price;}
+  else {buyer.horses.push(h);buyer.funds=num(buyer.funds)-price;}
   const at=horses.findIndex(x=>String(x.id)===String(h.id));if(at>=0)horses.splice(at,1);
   if(mine){world.money+=price;earned+=price;if(opts.archive)opts.archive(h,world.year);}else if(seller)seller.funds=num(seller.funds)+price;
   sold++;results.push({horseId:h.id,horseName:h.name,seller:lot.seller,status:'sold',buyer:buyer==='player'?'player':buyer.name,price});

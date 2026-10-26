@@ -68,18 +68,20 @@
         finishing:jockeyFinish,
         variation:(random()-.5)*.24,
         stridePhase:random()*Math.PI*2,
-        lane:i%4
+        lane:i%10,laneChanges:0,lastLaneChangeAt:-100,blockedSteps:0
       };
     });
     const interval=.5;
     const sampleEvery=5;
     let step=0,time=0;
     const frames=[];
-    function snapshot(t){frames.push({t:round(t,2),p:runners.map(x=>round(x.pos,1)),v:runners.map(x=>round(x.velocity,2))});}
+    function snapshot(t){frames.push({t:round(t,2),p:runners.map(x=>round(x.pos,1)),v:runners.map(x=>round(x.velocity,2)),l:runners.map(x=>x.lane)});}
     snapshot(0);
     while(runners.some(x=>x.finish===null) && step<1500) {
       const alive=runners.filter(x=>x.finish===null);
       const prior=alive.map(x=>x.pos);
+      // One immutable snapshot per step avoids field-order bias in traffic.
+      const pack=alive.map(x=>({id:x.id,pos:x.pos,velocity:x.velocity,lane:x.lane}));
       // Each horse's current physical position determines its current race phase.
       alive.forEach((x,index)=>{
         if(time<x.startDelay){x.velocity=0;return;}
@@ -90,7 +92,21 @@
         const noise=(Math.sin(time*.55+x.stridePhase)+Math.sin(time*.19+x.stridePhase*2))*.027;
         const energyPenalty=x.energy<.26?( .26-x.energy )*2.4:0;
         const finishAbility=fraction>.76?(x.finishing-77)*.003:0;
-        const goal=clamp(x.base+tactic+x.variation+noise-cornerPenalty-energyPenalty+finishAbility,11.5,19.8);
+        // Passing requires a clear adjacent lane. A trapped runner loses a
+        // little momentum; good horses can still recover once space opens.
+        let trafficPenalty=0;
+        if(time>3&&x.pos<distance-15){
+          const ahead=pack.filter(y=>y.id!==x.id&&y.lane===x.lane&&
+            y.pos>x.pos+.05&&y.pos-x.pos<8&&y.velocity<x.velocity+.25)
+            .sort((a,b)=>a.pos-b.pos)[0];
+          if(ahead){
+            const choices=[x.lane-1,x.lane+1].filter(l=>l>=0&&l<=9);
+            const free=choices.find(l=>pack.every(y=>y.id===x.id||y.lane!==l||Math.abs(y.pos-x.pos)>=5));
+            if(free!==undefined&&time-x.lastLaneChangeAt>=8){x.lane=free;x.lastLaneChangeAt=time;x.laneChanges++;}
+            else {trafficPenalty=clamp(.06+Math.max(0,x.velocity-ahead.velocity)*.13,.06,.26);x.blockedSteps++;}
+          }
+        }
+        const goal=clamp(x.base+tactic+x.variation+noise-cornerPenalty-energyPenalty+finishAbility-trafficPenalty,11.5,19.8);
         const accel=clamp(x.acceleration,.58,1.6)*interval;
         x.velocity=clamp(x.velocity+clamp(goal-x.velocity,-.23*interval,accel),0,20);
         x.pos=Math.min(distance,x.pos+x.velocity*interval);
@@ -116,6 +132,7 @@
       ids:runners.map(x=>x.id),names:runners.map(x=>x.name),
       frames,results,finishSeconds:round(Math.max(...runners.map(x=>x.finish)),2),
       behaviorEvents:runners.filter(x=>x.responseType!=='none').map(x=>({horseId:x.id,type:x.responseType,startDelay:x.startDelay,paceWaste:x.responseWaste})),
+      raceDynamics:runners.map(x=>({horseId:x.id,laneChanges:x.laneChanges,blockedSeconds:round(x.blockedSteps*interval,1)})),
       explanation:'시간 단계별 위치·속도·지구력 기반 계산. 경기 그래픽/물리 인증과는 별도.'
     };
   }

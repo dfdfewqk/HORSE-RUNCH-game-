@@ -59,6 +59,8 @@ function complete(world,race,ctx,usedIds){
     seen.add(id);
     return{horseId:h.id,horseName:h.name,place:i+1,time:Number(item.time).toFixed(2)};
   });
+  // Prize ownership is fixed at the actual start, even if an auction transfers the horse before payday.
+  race.npcPurseOwners=Object.fromEntries(entrants.map(x=>[String(x.h.id),x.npc.name]));
   race.result=rows;race.state='finished';
   race.npcAutoResult={version:1,status:'finished',date:day,winner:rows[0].horseName,entrants:rows.length};
   race.ratingChanges=[];
