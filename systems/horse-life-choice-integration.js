@@ -30,7 +30,7 @@ window.hrLifeReturn=function(id){
 };
 const previousStable=stable;
 stable=function(){
- let html=previousStable.apply(this,arguments);
+ const original=previousStable.apply(this,arguments);let html='';
  const owned=state.horses,pending=C.ensure(state).pending.map(q=>C.find(state,q.id)).filter(Boolean);
  const resolved=owned.filter(h=>h.retired&&h.hrAftercare?.status!=='pending');
  const active=owned.filter(h=>!h.retired);
@@ -54,7 +54,7 @@ stable=function(){
   html+='<details style="margin-top:8px"><summary>보유마 경주 은퇴 결정</summary>'+
    active.map(h=>'<div class="row" style="margin-top:7px"><span>'+escapeHtml(h.name)+'</span><button class="action gray" onclick="hrLifeRequest('+Number(h.id)+')">경주 은퇴</button></div>').join('')+'</details>';
  }
- return html+'</div>';
+ return pending.length?html+'</div>'+original:original+html+'</div>';
 };
 const oldDashboard=dashboard;
 dashboard=function(){
