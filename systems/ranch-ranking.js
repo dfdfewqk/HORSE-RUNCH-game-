@@ -72,7 +72,7 @@ function ranking(world){
    const raw=events.reduce((sum,e)=>sum+points(e.grade,e.place)*(.6+.4*(1-(day-e.day)/WINDOW)),0);
    // Smooth diminishing returns: a hard ceiling caused every established
    // stable to tie at 90 points in long-running leagues, erasing race merit.
-   const meritScore=round1(MAX_MERIT*(1-Math.exp(-raw/MAX_MERIT)));
+   const meritScore=round1(MAX_MERIT*raw/(MAX_MERIT+raw));
    const wins=events.filter(e=>num(e.place)===1);
    const score=round1(strengthScore+meritScore);
    return{name:r.name,player:r.player,score,strengthScore,meritScore,active:active.length,
