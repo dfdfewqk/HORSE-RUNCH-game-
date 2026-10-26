@@ -1,0 +1,29 @@
+name: HORSE RANCH agreed core checks
+on:
+  push:
+    branches:
+      - work/hr-core-agreed-starter-construction-20261026
+  pull_request:
+    paths:
+      - index.html
+      - systems/core-starter-alignment.js
+      - systems/ranch-construction*.js
+      - tests/core_agreed_starter_construction.test.cjs
+      - .github/workflows/core-agreed-tests.yml
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check systems/ranch-construction.js
+      - run: node --check systems/ranch-construction-integration.js
+      - run: node --check systems/core-starter-alignment.js
+      - run: node tests/core_agreed_starter_construction.test.cjs
+      - run: |
+          for test in tests/*.test.cjs; do
+            echo "Running $test"
+            node "$test"
+          done
