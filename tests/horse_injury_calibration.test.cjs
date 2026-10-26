@@ -34,12 +34,12 @@ const healthy=()=>({id:1,name:'검증마',age:3,retired:false,injury:0,
  const fast=P.durations('moderate',()=>0,false);
  const sum=x=>x.treatmentDays+x.rehabilitationDays+x.gradualReturnDays;
  assert.ok(sum(slow)>sum(fast));
- const roll=[0,0.99,0,0,0,0.99];let i=0;
+ const roll=[0,0.99,0,0,0.99];let i=0;
  const outcome=P.evaluate(healthy(),'race',H,()=>roll[i++]);
  assert.equal(outcome.occurred,true);
  assert.equal(outcome.report.severity,'severe');
  assert.equal(outcome.report.returnAllowed,true);
- const endRoll=[0,0.99,0,0,0,0];let j=0;
+ const endRoll=[0,0.99,0,0,0];let j=0;
  const ending=P.evaluate(healthy(),'race',H,()=>endRoll[j++]);
  assert.equal(ending.report.returnAllowed,false);
 }
