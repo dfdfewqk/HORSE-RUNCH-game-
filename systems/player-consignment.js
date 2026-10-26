@@ -53,6 +53,14 @@ function school(c,kind,days){
   if(!I.COURSE[kind]?.days.includes(duration))return{ok:false,reason:'교육 과정이나 기간이 올바르지 않습니다.'};
   if(dayOf(state)+duration>c.ends)return{ok:false,reason:'계약 기간 안에 완료할 수 있는 교육만 신청할 수 있습니다.'};
   if(!cost||cost>c.specialRemaining)return{ok:false,reason:'NPC 마주의 특별 조교 예산이 부족합니다.'};
+  if(I.legacy(c.horse)){
+    if(c.specialJobs?.some(j=>j.status==='active')||I.occupied(proxy(),c.horse.id)||I.booked(proxy(),c.horse.id))
+      return{ok:false,reason:'이미 진행 중인 특별 조교가 있습니다.'};
+    if(!Array.isArray(c.specialJobs))c.specialJobs=[];
+    c.specialJobs.push({kind,days:duration,starts:dayOf(state),ends:dayOf(state)+duration,status:'active',cost});
+    c.specialRemaining-=cost;c.specialSpent+=cost;
+    return{ok:true,cost};
+  }
   const r=I.enroll(proxy(),c.horse,kind,duration);
   if(!r.ok)return r;
   c.specialRemaining-=cost;c.specialSpent+=cost;
@@ -61,6 +69,7 @@ function school(c,kind,days){
 function rider(c,jid,days){
   if(!c||c.status!=='active')return{ok:false,reason:'유효한 계약이 아닙니다.'};
   if(!['development','race'].includes(c.type))return{ok:false,reason:'일반 관리 계약에는 특별 조교 권한이 없습니다.'};
+  if(c.specialJobs?.some(j=>j.status==='active'))return{ok:false,reason:'진행 중인 특별 조교가 있습니다.'};
   const j=getJockey(jid),duration=Number(days),cost=Math.ceil(duration/7)*CFG.riderWeekFee;
   if(dayOf(state)+duration>c.ends)return{ok:false,reason:'계약 기간을 넘기는 조교는 신청할 수 없습니다.'};
   if(cost>c.specialRemaining)return{ok:false,reason:'NPC 마주의 특별 조교 예산이 부족합니다.'};
@@ -122,6 +131,18 @@ function tick(){
         }
       }
     }
+    for(const job of c.specialJobs||[]){
+      if(job.status!=='active'||end<job.ends)continue;
+      const stat=({ground:'power',ride:'stamina',gate:'power',race:'speed'})[job.kind];
+      const cap=window.HorseRanchLifeCycle?.effectiveCap?.(c.horse,stat)??num(c.horse.caps?.[stat]);
+      const sessions=Math.ceil(job.days/7);
+      for(let k=0;k<sessions&&num(c.horse[stat])<cap;k++){
+        const gain=F.trainingGain(c.horse,stat,()=>((Math.imul(job.ends+num(c.horse.id)+k,2654435761)>>>0)/4294967296));
+        c.horse[stat]=Math.min(cap,num(c.horse[stat])+gain);
+      }
+      job.status='completed';
+      changed=true;
+    }
     if(end>c.lastTickDay){c.lastTickDay=end;changed=true;}
     if(now>=c.ends){finish(c);changed=true;}
   }
@@ -131,7 +152,7 @@ function racePermission(c,r){
   if(!c?.raceRights||c.status!=='active')return '계약에 경주 출전 권한이 없습니다.';
   if(!r||r.state==='finished')return '출전할 수 없는 경주입니다.';
   if(dayOf(r)>c.ends||dayOf(r)<dayOf(state))return '위탁 계약 기간 밖의 경주입니다.';
-  if(I.occupied(proxy(),c.horse.id)||I.booked(proxy(),c.horse.id))return '특별 조교 중에는 경주에 출전할 수 없습니다.';
+  if(I.occupied(proxy(),c.horse.id)||I.booked(proxy(),c.horse.id)||c.specialJobs?.some(j=>j.status==='active'))return '특별 조교 중에는 경주에 출전할 수 없습니다.';
   if(!eligible(c.horse,r))return '출전 자격 또는 휴식 조건이 충족되지 않았습니다.';
   return null;
 }
